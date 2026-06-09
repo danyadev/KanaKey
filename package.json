@@ -1,0 +1,24 @@
+{
+  "name": "kanakey",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "vite": "latest",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@vue/tsconfig": "latest",
+    "typescript": "latest",
+    "vitest": "latest",
+    "vue-tsc": "latest",
+    "@types/node": "latest"
+  }
+}

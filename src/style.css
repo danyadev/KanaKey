@@ -1,0 +1,445 @@
+:root {
+  color-scheme: light;
+  --ink: #1e1a14;
+  --muted: #756f63;
+  --paper: #f8efe0;
+  --panel: rgba(255, 250, 239, 0.86);
+  --line: rgba(60, 45, 26, 0.16);
+  --gold: #d1902f;
+  --vermilion: #c84b31;
+  --moss: #567c55;
+  --sea: #2f7285;
+  --shadow: 0 22px 70px rgba(76, 47, 19, 0.18);
+  --radius: 28px;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Iowan Old Style", Georgia, serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(200, 75, 49, 0.18), transparent 28rem),
+    radial-gradient(circle at 88% 8%, rgba(47, 114, 133, 0.2), transparent 30rem),
+    linear-gradient(135deg, #fbf4e8 0%, #ead7bd 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(60, 45, 26, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 45, 26, 0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.shell {
+  position: relative;
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 54px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 320px);
+  gap: 24px;
+  align-items: stretch;
+  padding: 34px;
+  overflow: hidden;
+}
+
+.hero h1 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(2.6rem, 8vw, 6.8rem);
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+}
+
+.lede {
+  max-width: 660px;
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--vermilion);
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.target-card {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.54), transparent 44%),
+    conic-gradient(from 20deg, #f8df95, #d46a42, #2f7285, #87a76b, #f8df95);
+  color: #fff8eb;
+  text-align: center;
+}
+
+.target-card span,
+.target-card small {
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.target-card strong {
+  display: block;
+  color: white;
+  font-size: clamp(5rem, 14vw, 9rem);
+  line-height: 0.8;
+  text-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.stat {
+  padding: 20px;
+}
+
+.stat span {
+  display: block;
+  color: var(--muted);
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 2rem;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+}
+
+.practice,
+.settings-panel,
+.progress-panel,
+.history-panel {
+  padding: 24px;
+}
+
+.section-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-head.compact {
+  align-items: center;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 4.8rem);
+  line-height: 1.24;
+  word-break: keep-all;
+}
+
+.ghost,
+.primary,
+.danger,
+.mode-switch button {
+  border-radius: 999px;
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  font-weight: 800;
+}
+
+.ghost {
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--ink);
+}
+
+.warning {
+  margin: 18px 0 0;
+  color: var(--vermilion);
+  font-weight: 700;
+}
+
+.typing-box {
+  width: 100%;
+  min-height: 190px;
+  margin-top: 24px;
+  padding: 22px;
+  resize: vertical;
+  border: 2px solid rgba(30, 26, 20, 0.28);
+  border-radius: 24px;
+  outline: none;
+  background: rgba(255, 252, 245, 0.8);
+  color: var(--ink);
+  font-size: clamp(1.8rem, 4vw, 3.7rem);
+  line-height: 1.35;
+}
+
+.typing-box:focus {
+  border-color: var(--sea);
+  box-shadow: 0 0 0 5px rgba(47, 114, 133, 0.16);
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.primary {
+  padding: 14px 22px;
+  background: var(--ink);
+  color: #fff8eb;
+}
+
+.hint,
+.legend,
+.empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.result-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.result-strip span {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #efe2cb;
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: #ead8bb;
+}
+
+.mode-switch button {
+  padding: 9px 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mode-switch .active {
+  background: #fff8eb;
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(76, 47, 19, 0.12);
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-family: "Avenir Next", "Gill Sans", sans-serif;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+input[type="number"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 252, 245, 0.8);
+  color: var(--ink);
+}
+
+.check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--ink);
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--vermilion);
+}
+
+.danger {
+  margin-top: 4px;
+  padding: 12px 16px;
+  background: rgba(200, 75, 49, 0.12);
+  color: var(--vermilion);
+}
+
+.progress-panel,
+.history-panel {
+  margin-top: 18px;
+}
+
+.kana-map {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.kana-pill {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--line);
+  font-size: 1.2rem;
+}
+
+.kana-pill.current {
+  background: var(--vermilion);
+  color: white;
+  border-color: transparent;
+}
+
+.kana-pill.passed {
+  background: rgba(86, 124, 85, 0.18);
+  color: #365c34;
+  border-color: rgba(86, 124, 85, 0.25);
+}
+
+.kana-pill.weak {
+  background: rgba(209, 144, 47, 0.18);
+  color: #7b5318;
+  border-color: rgba(209, 144, 47, 0.28);
+}
+
+.kana-pill.locked {
+  opacity: 0.38;
+  filter: grayscale(0.8);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 48px 90px 70px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.history-item small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    width: min(100% - 20px, 680px);
+    padding-top: 10px;
+  }
+
+  .hero,
+  .workspace,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero,
+  .practice,
+  .settings-panel,
+  .progress-panel,
+  .history-panel {
+    padding: 18px;
+  }
+
+  .target-card {
+    min-height: 180px;
+  }
+
+  .actions,
+  .section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-item {
+    grid-template-columns: 42px 1fr 58px;
+  }
+
+  .history-item small {
+    grid-column: 1 / -1;
+  }
+}
