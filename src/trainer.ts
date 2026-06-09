@@ -43,15 +43,24 @@ export function createEmptyKanaStats(kana: string): KanaStats {
 }
 
 export function normalizeSettings(input: Partial<PracticeSettings> = {}): PracticeSettings {
-  const settings = { ...DEFAULT_SETTINGS, ...input }
+  const mode = isPracticeMode(input.mode) ? input.mode : DEFAULT_SETTINGS.mode
+  const settings = { ...DEFAULT_SETTINGS, ...input, mode }
+  const doubleWords = typeof input.doubleWords === 'boolean' ? input.doubleWords : DEFAULT_SETTINGS.doubleWords
+  const shuffleDoubledWords = typeof input.shuffleDoubledWords === 'boolean'
+    ? input.shuffleDoubledWords
+    : DEFAULT_SETTINGS.shuffleDoubledWords
+
   return {
     ...settings,
+    mode,
     batchSize: clampInteger(settings.batchSize, 1, 50),
-    initialUnlockedCount: clampInteger(settings.initialUnlockedCount, 1, getKanaOrder(settings.mode).length),
+    initialUnlockedCount: clampInteger(settings.initialUnlockedCount, 1, getKanaOrder(mode).length),
     targetKpm: clampInteger(settings.targetKpm, 1, 400),
     targetAccuracy: clampNumber(settings.targetAccuracy, 0.5, 1),
     minAttemptsPerKana: clampInteger(settings.minAttemptsPerKana, 1, 20),
     smoothingWindow: clampInteger(settings.smoothingWindow, 1, 20),
+    doubleWords,
+    shuffleDoubledWords,
   }
 }
 
@@ -149,17 +158,24 @@ export function generateBatch(
   for (const word of batch) selectedIds.add(word.id)
 
   if (batch.length < settings.batchSize) {
-    const fallbackWords = unlockedWords.filter((word) => !selectedIds.has(word.id))
-    batch = batch.concat(takeShuffled(fallbackWords, settings.batchSize - batch.length, random))
+    const syntheticWords = generateSyntheticChunks(
+      getUnlockedKana(progress, mode),
+      targetKana,
+      mode,
+      settings.batchSize - batch.length,
+      random,
+      selectedIds,
+    )
+    batch = batch.concat(syntheticWords)
+    for (const word of syntheticWords) selectedIds.add(word.id)
   }
 
-  while (batch.length < settings.batchSize && unlockedWords.length > 0) {
-    batch.push(unlockedWords[Math.floor(random() * unlockedWords.length)])
+  const repeatableWords = batch.length > 0 ? batch : unlockedWords
+  while (batch.length < settings.batchSize && repeatableWords.length > 0) {
+    batch.push(repeatableWords[Math.floor(random() * repeatableWords.length)])
   }
 
-  const warning = unlockedWords.length === 0
-    ? `No unlocked words for ${mode}. Unlock count may be too low for the seed list.`
-    : batch.length < settings.batchSize
+  const warning = batch.length < settings.batchSize
       ? `Only generated ${batch.length} words for this batch.`
       : null
 
@@ -315,6 +331,51 @@ export function progressSummary(progress: ProgressState, settings: PracticeSetti
 function duplicateWords(words: WordEntry[], shuffle: boolean, random: () => number): WordEntry[] {
   const doubled = words.flatMap((word) => [word, word])
   return shuffle ? shuffleArray(doubled, random) : doubled
+}
+
+function generateSyntheticChunks(
+  unlockedKana: string[],
+  targetKana: string,
+  mode: PracticeMode,
+  count: number,
+  random: () => number,
+  excludedIds = new Set<string>(),
+): WordEntry[] {
+  if (count <= 0 || !unlockedKana.includes(targetKana)) return []
+
+  const candidates = new Set<string>()
+  candidates.add(targetKana)
+
+  for (const kana of unlockedKana) {
+    candidates.add(`${targetKana}${kana}`)
+    candidates.add(`${kana}${targetKana}`)
+  }
+
+  for (let index = 0; candidates.size < count * 3 && index < unlockedKana.length * 8; index += 1) {
+    const left = unlockedKana[index % unlockedKana.length]
+    const right = unlockedKana[(index + 1) % unlockedKana.length]
+    const tail = unlockedKana[(index + 2) % unlockedKana.length]
+    candidates.add(`${left}${targetKana}${right}`)
+    candidates.add(`${targetKana}${right}${tail}`)
+    candidates.add(`${left}${right}${targetKana}`)
+  }
+
+  const allowedCandidates = [...candidates].filter((kana) => !excludedIds.has(`synthetic-${mode}-${kana}`))
+
+  return takeShuffled(allowedCandidates, count, random)
+    .map((kana) => createSyntheticWord(kana, mode))
+    .slice(0, count)
+}
+
+function createSyntheticWord(kana: string, mode: PracticeMode): WordEntry {
+  return {
+    id: `synthetic-${mode}-${kana}`,
+    kanji: null,
+    kana,
+    kanaScript: mode,
+    synthetic: true,
+    tags: ['synthetic'],
+  }
 }
 
 function takeShuffled<T>(items: T[], count: number, random: () => number): T[] {

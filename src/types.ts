@@ -9,6 +9,7 @@ export type WordEntry = {
   kanji: string | null
   kana: string
   kanaScript: KanaScript
+  synthetic?: boolean
   meaning?: string
   jlpt?: JlptLevel
   tags?: string[]

@@ -39,11 +39,21 @@ function fixedRandom() {
 
 describe('trainer logic', () => {
   it('normalizes persisted settings into safe bounds', () => {
-    const normalized = normalizeSettings({ batchSize: -5, targetAccuracy: 2, smoothingWindow: 0 })
+    const normalized = normalizeSettings({
+      batchSize: -5,
+      targetAccuracy: 2,
+      smoothingWindow: 0,
+      mode: 'invalid',
+      doubleWords: 'true',
+      shuffleDoubledWords: 1,
+    } as unknown as Partial<PracticeSettings>)
 
     expect(normalized.batchSize).toBe(1)
     expect(normalized.targetAccuracy).toBe(1)
     expect(normalized.smoothingWindow).toBe(1)
+    expect(normalized.mode).toBe('hiragana')
+    expect(normalized.doubleWords).toBe(false)
+    expect(normalized.shuffleDoubledWords).toBe(false)
   })
 
   it('checks unlocked words by visible kana units', () => {
@@ -51,13 +61,27 @@ describe('trainer logic', () => {
     expect(isWordUnlocked(words[3], new Set(['あ', 'い', 'う', 'え', 'お']))).toBe(false)
   })
 
-  it('generates target words first and falls back to unlocked words when needed', () => {
+  it('generates real target words first and uses synthetic target chunks when needed', () => {
     const progress = createInitialProgress(settings)
     const batch = generateBatch(words, settings, progress, fixedRandom)
 
     expect(batch.words).toHaveLength(3)
-    expect(batch.words.filter((word) => word.kana.includes('あ'))).toHaveLength(2)
+    expect(batch.words.every((word) => word.kana.includes('あ'))).toBe(true)
+    expect(batch.words.filter((word) => word.synthetic)).toHaveLength(1)
     expect(batch.words.every((word) => isWordUnlocked(word, new Set(['あ', 'い', 'う', 'え', 'お'])))).toBe(true)
+  })
+
+  it('generates synthetic chunks when a newly unlocked target has no real words', () => {
+    const progress = createInitialProgress({ ...settings, initialUnlockedCount: 6 })
+    progress.unlockedCountByMode.hiragana = 6
+    progress.currentTargetKanaByMode.hiragana = 'か'
+
+    const batch = generateBatch(words.filter((word) => !word.kana.includes('か')), settings, progress, fixedRandom)
+
+    expect(batch.words).toHaveLength(3)
+    expect(batch.words.every((word) => word.synthetic)).toBe(true)
+    expect(batch.words.every((word) => word.kana.includes('か'))).toBe(true)
+    expect(batch.words.every((word) => isWordUnlocked(word, new Set(['あ', 'い', 'う', 'え', 'お', 'か'])))).toBe(true)
   })
 
   it('supports doubled words without shuffle', () => {
@@ -130,6 +154,28 @@ describe('trainer logic', () => {
     expect(progress.unlockedCountByMode.hiragana).toBe(6)
   })
 
+  it('can progress past a kana that only has synthetic practice rounds', () => {
+    const syntheticSettings = { ...settings, batchSize: 3, initialUnlockedCount: 6 }
+    let progress = createInitialProgress(syntheticSettings)
+    progress.unlockedCountByMode.hiragana = 6
+    progress.currentTargetKanaByMode.hiragana = 'か'
+
+    for (const kana of ['あ', 'い', 'う', 'え', 'お']) {
+      markPassed(progress.kanaStatsByMode.hiragana[kana], syntheticSettings)
+    }
+
+    for (let round = 0; round < syntheticSettings.minAttemptsPerKana; round += 1) {
+      const batch = generateBatch(words.filter((word) => !word.kana.includes('か')), syntheticSettings, progress, fixedRandom).words
+      expect(batch.some((word) => word.synthetic && word.kana.includes('か'))).toBe(true)
+      const evaluation = evaluateBatch(expectedText(batch), expectedText(batch), 1_000)
+      progress = applyEvaluationToProgress(progress, syntheticSettings, evaluation, batch, round + 1)
+    }
+
+    expect(progress.kanaStatsByMode.hiragana['か'].passed).toBe(true)
+    expect(progress.currentTargetKanaByMode.hiragana).toBe('き')
+    expect(progress.unlockedCountByMode.hiragana).toBe(7)
+  })
+
   it('updates only kana that appeared in the batch', () => {
     const progress = createInitialProgress(settings)
     const batch = generateBatch(words, settings, progress, fixedRandom).words
@@ -141,3 +187,16 @@ describe('trainer logic', () => {
     expect(next.kanaStatsByMode.hiragana['か'].attempts).toBe(0)
   })
 })
+
+function markPassed(stats: ReturnType<typeof createEmptyKanaStats>, practiceSettings: PracticeSettings) {
+  stats.attempts = practiceSettings.minAttemptsPerKana
+  stats.recentAttempts = Array.from({ length: practiceSettings.minAttemptsPerKana }, (_, index) => ({
+    timestamp: index + 1,
+    exposures: 2,
+    correct: 2,
+    incorrect: 0,
+    kpm: practiceSettings.targetKpm + 20,
+    accuracy: 1,
+  }))
+  refreshSmoothedStats(stats, practiceSettings)
+}
