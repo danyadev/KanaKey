@@ -1,0 +1,13 @@
+.trainer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+@media (max-width: 940px) {
+  .trainer-layout {
+    grid-template-columns: 1fr;
+  }
+}

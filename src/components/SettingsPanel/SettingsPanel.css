@@ -1,0 +1,108 @@
+.settings-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 22px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: #ead8bb;
+}
+
+.mode-switch button {
+  padding: 9px 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mode-switch .active {
+  background: #fff8eb;
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(76, 47, 19, 0.12);
+}
+
+.quick-settings,
+.advanced-grid {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+input[type="number"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 252, 245, 0.8);
+  color: var(--ink);
+}
+
+.check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--ink);
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--vermilion);
+}
+
+.advanced-settings {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.advanced-settings summary {
+  width: fit-content;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.36);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
+  list-style: none;
+}
+
+.advanced-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-grid {
+  margin-top: 12px;
+}
+
+.danger {
+  margin-top: 2px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: rgba(200, 75, 49, 0.12);
+  color: var(--vermilion);
+  font-weight: 800;
+}
+
+@media (max-width: 940px) {
+  .settings-panel {
+    order: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-panel {
+    padding: 18px;
+  }
+}

@@ -2,7 +2,8 @@
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": [
     "src/**/*.ts",
-    "src/**/*.vue"
+    "src/**/*.vue",
+    "src/**/*.tsx"
   ],
   "exclude": [
     "src/**/*.test.ts"
@@ -13,6 +14,8 @@
     "types": [
       "vite/client"
     ],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "jsxImportSource": "vue"
   }
 }

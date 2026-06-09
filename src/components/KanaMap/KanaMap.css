@@ -1,0 +1,103 @@
+.progress-panel {
+  margin-top: 18px;
+  padding: 24px;
+}
+
+.section-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-head.compact {
+  align-items: center;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  line-height: 1.1;
+}
+
+.legend {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.kana-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.kana-row {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.row-label {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(30, 26, 20, 0.08);
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.row-kana {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.kana-pill {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 1.16rem;
+}
+
+.kana-pill.current {
+  background: var(--vermilion);
+  color: white;
+  border-color: transparent;
+}
+
+.kana-pill.passed {
+  background: rgba(86, 124, 85, 0.18);
+  color: #365c34;
+  border-color: rgba(86, 124, 85, 0.25);
+}
+
+.kana-pill.weak {
+  background: rgba(209, 144, 47, 0.18);
+  color: #7b5318;
+  border-color: rgba(209, 144, 47, 0.28);
+}
+
+.kana-pill.locked {
+  opacity: 0.34;
+  filter: grayscale(0.8);
+}
+
+@media (max-width: 760px) {
+  .progress-panel {
+    padding: 18px;
+  }
+
+  .section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
