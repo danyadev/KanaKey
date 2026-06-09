@@ -13,6 +13,7 @@ import {
   isWordUnlocked,
   normalizeSettings,
   normalizeTypedText,
+  refreshProgressPassFlags,
   refreshSmoothedStats,
 } from './trainer'
 
@@ -185,6 +186,30 @@ describe('trainer logic', () => {
     expect(next.kanaStatsByMode.hiragana['あ'].attempts).toBe(1)
     expect(next.kanaStatsByMode.hiragana['い'].attempts).toBeGreaterThanOrEqual(1)
     expect(next.kanaStatsByMode.hiragana['か'].attempts).toBe(0)
+  })
+
+  it('recomputes pass flags for new target settings without mutating counts or history', () => {
+    const progress = createInitialProgress(settings)
+    const stats = progress.kanaStatsByMode.hiragana['あ']
+    markPassed(stats, settings)
+    stats.exposures = 12
+    progress.sessionHistory.push({
+      timestamp: 1,
+      mode: 'hiragana',
+      targetKana: 'あ',
+      words: ['あい'],
+      elapsedMs: 1000,
+      kpm: 120,
+      accuracy: 1,
+    })
+
+    const next = refreshProgressPassFlags(progress, { ...settings, targetKpm: 500 })
+
+    expect(progress.kanaStatsByMode.hiragana['あ'].passed).toBe(true)
+    expect(next.kanaStatsByMode.hiragana['あ'].passed).toBe(false)
+    expect(next.kanaStatsByMode.hiragana['あ'].exposures).toBe(12)
+    expect(next.kanaStatsByMode.hiragana['あ'].attempts).toBe(settings.minAttemptsPerKana)
+    expect(next.sessionHistory).toEqual(progress.sessionHistory)
   })
 })
 

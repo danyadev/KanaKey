@@ -1,11 +1,11 @@
 .history-panel {
-  margin-top: 18px;
-  padding: 24px;
+  margin-top: 12px;
+  padding: 14px;
 }
 
 .history-panel .section-head {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -16,30 +16,37 @@
 
 .history-panel .section-head h2 {
   margin: 0;
-  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  font-weight: 600;
   line-height: 1.1;
 }
 
 .empty {
   margin: 0;
   color: var(--muted);
-  line-height: 1.5;
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 
 .history-list {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 7px;
+  margin-top: 10px;
 }
 
 .history-item {
   display: grid;
-  grid-template-columns: 48px 90px 70px 1fr;
-  gap: 12px;
+  grid-template-columns: 40px 80px 58px 1fr;
+  gap: 10px;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.38);
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.32);
+  font-size: 0.86rem;
+}
+
+.history-item strong {
+  font-weight: 500;
 }
 
 .history-item small {
@@ -51,7 +58,7 @@
 
 @media (max-width: 760px) {
   .history-panel {
-    padding: 18px;
+    padding: 16px;
   }
 
   .history-panel .section-head {

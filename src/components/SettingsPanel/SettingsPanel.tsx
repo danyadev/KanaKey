@@ -1,27 +1,13 @@
 import { defineComponent } from 'vue'
 
-import type { PracticeMode } from '../../types'
+import type { PracticeSettings } from '../../types'
 import './SettingsPanel.css'
 
 type SettingsPanelProps = {
-  mode: PracticeMode
-  batchSize: number
-  doubleWords: boolean
-  shuffleDoubledWords: boolean
-  targetKpm: number
+  settings: PracticeSettings
   accuracyPercent: number
-  initialUnlockedCount: number
-  minAttemptsPerKana: number
-  smoothingWindow: number
-  setMode: (mode: PracticeMode) => void
-  setBatchSize: (value: number) => void
-  setDoubleWords: (value: boolean) => void
-  setShuffleDoubledWords: (value: boolean) => void
-  setTargetKpm: (value: number) => void
+  updateSettings: (patch: Partial<PracticeSettings>) => void
   setAccuracyPercent: (value: number) => void
-  setInitialUnlockedCount: (value: number) => void
-  setMinAttemptsPerKana: (value: number) => void
-  setSmoothingWindow: (value: number) => void
   resetProgress: () => void
 }
 
@@ -30,22 +16,22 @@ export const SettingsPanel = defineComponent<SettingsPanelProps>((props, _ctx) =
     <aside class="panel settings-panel">
       <p class="eyebrow">Session controls</p>
       <div class="mode-switch" aria-label="Practice mode">
-        <button type="button" class={{ active: props.mode === 'hiragana' }} onClick={() => props.setMode('hiragana')}>Hiragana</button>
-        <button type="button" class={{ active: props.mode === 'katakana' }} onClick={() => props.setMode('katakana')}>Katakana</button>
-        <button type="button" class={{ active: props.mode === 'mixed' }} onClick={() => props.setMode('mixed')}>Mixed</button>
+        <button type="button" class={{ active: props.settings.mode === 'hiragana' }} onClick={() => props.updateSettings({ mode: 'hiragana' })}>Hiragana</button>
+        <button type="button" class={{ active: props.settings.mode === 'katakana' }} onClick={() => props.updateSettings({ mode: 'katakana' })}>Katakana</button>
+        <button type="button" class={{ active: props.settings.mode === 'mixed' }} onClick={() => props.updateSettings({ mode: 'mixed' })}>Mixed</button>
       </div>
 
       <div class="quick-settings">
         <label>
           Batch size
-          <input value={props.batchSize} type="number" min="1" max="50" onInput={(event) => props.setBatchSize(readNumber(event))} />
+          <input value={props.settings.batchSize} type="number" min="1" max="50" onInput={(event) => props.updateSettings({ batchSize: readNumber(event) })} />
         </label>
         <label class="check">
-          <input checked={props.doubleWords} type="checkbox" onChange={(event) => props.setDoubleWords(readChecked(event))} />
+          <input checked={props.settings.doubleWords} type="checkbox" onChange={(event) => props.updateSettings({ doubleWords: readChecked(event) })} />
           Double every word
         </label>
         <label class="check">
-          <input checked={props.shuffleDoubledWords} type="checkbox" disabled={!props.doubleWords} onChange={(event) => props.setShuffleDoubledWords(readChecked(event))} />
+          <input checked={props.settings.shuffleDoubledWords} type="checkbox" disabled={!props.settings.doubleWords} onChange={(event) => props.updateSettings({ shuffleDoubledWords: readChecked(event) })} />
           Shuffle doubled words
         </label>
       </div>
@@ -55,23 +41,23 @@ export const SettingsPanel = defineComponent<SettingsPanelProps>((props, _ctx) =
         <div class="advanced-grid">
           <label>
             Target kana/min
-            <input value={props.targetKpm} type="number" min="1" max="400" onInput={(event) => props.setTargetKpm(readNumber(event))} />
+            <input value={props.settings.targetKpm} type="number" min="1" max="400" onInput={(event) => props.updateSettings({ targetKpm: readNumber(event) })} />
           </label>
           <label>
             Target accuracy %
             <input value={props.accuracyPercent} type="number" min="50" max="100" onInput={(event) => props.setAccuracyPercent(readNumber(event))} />
           </label>
           <label>
-            Initial unlocked kana
-            <input value={props.initialUnlockedCount} type="number" min="1" max="160" onInput={(event) => props.setInitialUnlockedCount(readNumber(event))} />
+            Initial unlocked kana on reset
+            <input value={props.settings.initialUnlockedCount} type="number" min="1" max="160" onInput={(event) => props.updateSettings({ initialUnlockedCount: readNumber(event) })} />
           </label>
           <label>
             Minimum attempts per kana
-            <input value={props.minAttemptsPerKana} type="number" min="1" max="20" onInput={(event) => props.setMinAttemptsPerKana(readNumber(event))} />
+            <input value={props.settings.minAttemptsPerKana} type="number" min="1" max="20" onInput={(event) => props.updateSettings({ minAttemptsPerKana: readNumber(event) })} />
           </label>
           <label>
             Smoothing window
-            <input value={props.smoothingWindow} type="number" min="1" max="20" onInput={(event) => props.setSmoothingWindow(readNumber(event))} />
+            <input value={props.settings.smoothingWindow} type="number" min="1" max="20" onInput={(event) => props.updateSettings({ smoothingWindow: readNumber(event) })} />
           </label>
         </div>
       </details>
@@ -80,27 +66,7 @@ export const SettingsPanel = defineComponent<SettingsPanelProps>((props, _ctx) =
     </aside>
   )
 }, {
-  props: [
-    'mode',
-    'batchSize',
-    'doubleWords',
-    'shuffleDoubledWords',
-    'targetKpm',
-    'accuracyPercent',
-    'initialUnlockedCount',
-    'minAttemptsPerKana',
-    'smoothingWindow',
-    'setMode',
-    'setBatchSize',
-    'setDoubleWords',
-    'setShuffleDoubledWords',
-    'setTargetKpm',
-    'setAccuracyPercent',
-    'setInitialUnlockedCount',
-    'setMinAttemptsPerKana',
-    'setSmoothingWindow',
-    'resetProgress',
-  ],
+  props: ['settings', 'accuracyPercent', 'updateSettings', 'setAccuracyPercent', 'resetProgress'],
 })
 
 function readNumber(event: Event): number {

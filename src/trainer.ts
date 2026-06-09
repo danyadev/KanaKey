@@ -308,6 +308,18 @@ export function refreshSmoothedStats(stats: KanaStats, settings: PracticeSetting
   return stats
 }
 
+export function refreshProgressPassFlags(progress: ProgressState, settings: PracticeSettings): ProgressState {
+  const next: ProgressState = structuredClone(progress)
+
+  for (const mode of Object.keys(next.kanaStatsByMode) as PracticeMode[]) {
+    for (const stats of Object.values(next.kanaStatsByMode[mode])) {
+      refreshSmoothedStats(stats, settings)
+    }
+  }
+
+  return next
+}
+
 export function isKanaPassed(stats: KanaStats, settings: PracticeSettings): boolean {
   return stats.attempts >= settings.minAttemptsPerKana
     && stats.smoothedKpm >= settings.targetKpm

@@ -47,7 +47,7 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) =
           <p class="eyebrow">Practice line</p>
           <p class="practice-note">Use your Japanese IME. Type the kana line exactly, then press Ctrl/⌘+Enter.</p>
         </div>
-        <button type="button" class="ghost" onClick={props.regenerateBatch}>New batch</button>
+        <button type="button" class="ghost" onClick={() => props.regenerateBatch()}>New batch</button>
       </div>
 
       <div class="target-line kana-display" aria-label="Current practice words">

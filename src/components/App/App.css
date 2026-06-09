@@ -1,9 +1,9 @@
 .trainer-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 12px;
   align-items: start;
-  margin-top: 18px;
+  margin-top: 10px;
 }
 
 @media (max-width: 940px) {

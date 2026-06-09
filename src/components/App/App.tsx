@@ -11,7 +11,7 @@ import { StatsGrid } from '../StatsGrid/StatsGrid'
 import { getKanaOrder } from '../../kana'
 import seedWords from '../../words.json'
 import { clearProgress, loadProgress, loadSettings, saveProgress, saveSettings } from '../../storage'
-import type { BatchEvaluation, BatchResult, PracticeMode, PracticeSettings, ProgressState, WordEntry } from '../../types'
+import type { BatchEvaluation, BatchResult, PracticeSettings, ProgressState, WordEntry } from '../../types'
 import {
   applyEvaluationToProgress,
   createInitialProgress,
@@ -20,8 +20,13 @@ import {
   generateBatch,
   normalizeSettings,
   progressSummary,
+  refreshProgressPassFlags,
 } from '../../trainer'
 import './App.css'
+
+type RegenerateBatchOptions = {
+  focus?: boolean
+}
 
 export const App = defineComponent((_props, _ctx) => {
   const words = seedWords as WordEntry[]
@@ -33,6 +38,8 @@ export const App = defineComponent((_props, _ctx) => {
   const lastEvaluation = ref<BatchEvaluation | null>(null)
   const lastOutcomeTarget = ref<string | null>(null)
   const typingBox = ref<HTMLTextAreaElement | null>(null)
+  let lastHandledSettings = normalizeSettings(settings.value)
+  let lastHandledSettingsKey = serializeSettings(lastHandledSettings)
 
   const accuracyPercent = computed({
     get: () => Math.round(settings.value.targetAccuracy * 100),
@@ -95,19 +102,29 @@ export const App = defineComponent((_props, _ctx) => {
 
   watch(settings, (nextSettings) => {
     const normalized = normalizeSettings(nextSettings)
+    const normalizedKey = serializeSettings(normalized)
+
+    if (serializeSettings(nextSettings) !== normalizedKey) {
+      settings.value = normalized
+    }
+
+    if (normalizedKey === lastHandledSettingsKey) return
+
+    if (targetSettingsChanged(lastHandledSettings, normalized)) {
+      progress.value = refreshProgressPassFlags(progress.value, normalized)
+    }
+
     progress.value.mode = normalized.mode
+    lastHandledSettings = normalized
+    lastHandledSettingsKey = normalizedKey
     saveSettings(normalized)
     saveProgress(progress.value)
-    regenerateBatch()
+    regenerateBatch({ focus: false })
   }, { deep: true })
 
   onMounted(() => {
     focusTypingBox()
   })
-
-  function setMode(mode: PracticeMode) {
-    settings.value.mode = mode
-  }
 
   function submitBatch() {
     if (!canSubmit.value) return
@@ -123,15 +140,23 @@ export const App = defineComponent((_props, _ctx) => {
     regenerateBatch()
   }
 
-  function regenerateBatch() {
+  function regenerateBatch(options: RegenerateBatchOptions = {}) {
+    const { focus = true } = options
     batch.value = generateBatch(words, normalizeSettings(settings.value), progress.value)
-    focusTypingBox()
+    if (focus) focusTypingBox()
   }
 
   function clearInput() {
     typedText.value = ''
     startedAt.value = null
     focusTypingBox()
+  }
+
+  function updateSettings(patch: Partial<PracticeSettings>) {
+    settings.value = {
+      ...settings.value,
+      ...patch,
+    }
   }
 
   function updateTypedText(value: string) {
@@ -185,24 +210,10 @@ export const App = defineComponent((_props, _ctx) => {
         />
 
         <SettingsPanel
-          mode={settings.value.mode}
-          batchSize={settings.value.batchSize}
-          doubleWords={settings.value.doubleWords}
-          shuffleDoubledWords={settings.value.shuffleDoubledWords}
-          targetKpm={settings.value.targetKpm}
+          settings={settings.value}
           accuracyPercent={accuracyPercent.value}
-          initialUnlockedCount={settings.value.initialUnlockedCount}
-          minAttemptsPerKana={settings.value.minAttemptsPerKana}
-          smoothingWindow={settings.value.smoothingWindow}
-          setMode={setMode}
-          setBatchSize={(value) => { settings.value.batchSize = value }}
-          setDoubleWords={(value) => { settings.value.doubleWords = value }}
-          setShuffleDoubledWords={(value) => { settings.value.shuffleDoubledWords = value }}
-          setTargetKpm={(value) => { settings.value.targetKpm = value }}
+          updateSettings={updateSettings}
           setAccuracyPercent={(value) => { accuracyPercent.value = value }}
-          setInitialUnlockedCount={(value) => { settings.value.initialUnlockedCount = value }}
-          setMinAttemptsPerKana={(value) => { settings.value.minAttemptsPerKana = value }}
-          setSmoothingWindow={(value) => { settings.value.smoothingWindow = value }}
           resetProgress={resetProgress}
         />
       </section>
@@ -222,6 +233,17 @@ export const App = defineComponent((_props, _ctx) => {
 function meterPercent(value: number, target: number): number {
   if (target <= 0) return 0
   return Math.max(0, Math.min(100, Math.round((value / target) * 100)))
+}
+
+function serializeSettings(settings: PracticeSettings): string {
+  return JSON.stringify(settings)
+}
+
+function targetSettingsChanged(previous: PracticeSettings, next: PracticeSettings): boolean {
+  return previous.targetKpm !== next.targetKpm
+    || previous.targetAccuracy !== next.targetAccuracy
+    || previous.minAttemptsPerKana !== next.minAttemptsPerKana
+    || previous.smoothingWindow !== next.smoothingWindow
 }
 
 function buildOutcomeMessage(

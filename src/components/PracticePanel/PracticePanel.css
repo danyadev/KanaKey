@@ -1,12 +1,12 @@
 .practice {
-  padding: 26px;
+  padding: 16px;
 }
 
 .practice-topline,
 .actions,
 .pass-card-head {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -15,31 +15,33 @@
 .hint {
   margin: 0;
   color: var(--muted);
-  line-height: 1.5;
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 
 .target-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 14px;
+  gap: 7px 11px;
   align-items: center;
-  min-height: 124px;
-  margin-top: 22px;
-  padding: 24px;
-  border: 1px solid rgba(60, 45, 26, 0.18);
-  border-radius: 24px;
+  min-height: 76px;
+  margin-top: 12px;
+  padding: 13px 15px;
+  border: 1px solid rgba(60, 45, 26, 0.14);
+  border-radius: 14px;
   background:
-    linear-gradient(rgba(60, 45, 26, 0.055) 1px, transparent 1px),
-    rgba(255, 252, 245, 0.76);
-  background-size: 100% 36px;
+    linear-gradient(rgba(60, 45, 26, 0.035) 1px, transparent 1px),
+    rgba(255, 252, 245, 0.62);
+  background-size: 100% 28px;
 }
 
 .target-word {
   display: inline-block;
   color: var(--ink);
-  font-size: clamp(2.1rem, 5vw, 4.8rem);
-  line-height: 1.05;
-  letter-spacing: 0.02em;
+  font-size: clamp(1.5rem, 2.4vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
 }
 
 .target-word.synthetic {
@@ -48,14 +50,14 @@
 
 .target-empty {
   color: var(--muted);
-  font-size: 1.4rem;
+  font-size: 1.05rem;
 }
 
 .first-run {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 16px 0 0;
+  gap: 8px;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
   counter-reset: step;
@@ -63,82 +65,85 @@
 
 .first-run li {
   position: relative;
-  padding: 13px 14px 13px 42px;
-  border-radius: 18px;
-  background: rgba(47, 114, 133, 0.1);
-  color: #275e6d;
-  font-size: 0.9rem;
-  font-weight: 700;
+  padding: 9px 10px 9px 34px;
+  border-radius: 12px;
+  background: rgba(47, 114, 133, 0.08);
+  color: #315f6a;
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 .first-run li::before {
   counter-increment: step;
   content: counter(step);
   position: absolute;
-  left: 12px;
+  left: 10px;
   top: 50%;
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 999px;
   background: var(--sea);
   color: white;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 600;
   transform: translateY(-50%);
 }
 
 .warning,
 .outcome {
-  margin: 16px 0 0;
-  border-radius: 18px;
-  padding: 12px 14px;
-  font-weight: 700;
+  margin: 10px 0 0;
+  border-radius: 12px;
+  padding: 9px 11px;
+  font-size: 0.86rem;
+  font-weight: 500;
 }
 
 .warning {
-  background: rgba(200, 75, 49, 0.12);
+  background: rgba(200, 75, 49, 0.1);
   color: var(--vermilion);
 }
 
 .outcome {
-  background: rgba(86, 124, 85, 0.13);
+  background: rgba(86, 124, 85, 0.1);
   color: #365c34;
 }
 
 .typing-box {
   width: 100%;
-  min-height: 170px;
-  margin-top: 18px;
-  padding: 22px;
+  min-height: 84px;
+  margin-top: 12px;
+  padding: 13px 14px;
   resize: vertical;
-  border: 2px solid rgba(30, 26, 20, 0.28);
-  border-radius: 24px;
+  border: 1px solid rgba(30, 26, 20, 0.22);
+  border-radius: 15px;
   outline: none;
-  background: rgba(255, 252, 245, 0.82);
+  background: rgba(255, 252, 245, 0.72);
   color: var(--ink);
-  font-size: clamp(1.8rem, 4vw, 3.7rem);
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  font-weight: 400;
   line-height: 1.35;
 }
 
 .typing-box:focus {
   border-color: var(--sea);
-  box-shadow: 0 0 0 5px rgba(47, 114, 133, 0.16);
+  box-shadow: 0 0 0 3px rgba(47, 114, 133, 0.12);
 }
 
 .actions {
   align-items: center;
   justify-content: flex-start;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .pass-card {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
-  padding: 16px;
-  border-radius: 22px;
-  background: rgba(234, 216, 187, 0.56);
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: rgba(234, 216, 187, 0.42);
 }
 
 .pass-card-head {
@@ -150,25 +155,26 @@
 }
 
 .pass-card-head strong {
-  font-size: 2rem;
+  font-size: 1.55rem;
+  font-weight: 500;
   line-height: 1;
 }
 
 .meter-row {
   display: grid;
-  grid-template-columns: 78px minmax(80px, 1fr) 92px;
-  gap: 10px;
+  grid-template-columns: 72px minmax(80px, 1fr) 88px;
+  gap: 8px;
   align-items: center;
   color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .meter {
-  height: 9px;
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(30, 26, 20, 0.12);
+  background: rgba(30, 26, 20, 0.1);
 }
 
 .meter i {
@@ -180,26 +186,32 @@
 
 .meter-row b {
   color: var(--ink);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   text-align: right;
 }
 
 .result-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .result-strip span {
-  padding: 10px 14px;
+  padding: 7px 10px;
   border-radius: 999px;
-  background: #efe2cb;
+  background: rgba(239, 226, 203, 0.72);
+  font-size: 0.82rem;
+}
+
+.result-strip strong {
+  font-weight: 600;
 }
 
 @media (max-width: 760px) {
   .practice {
-    padding: 18px;
+    padding: 16px;
   }
 
   .practice-topline,
@@ -209,8 +221,12 @@
   }
 
   .target-line {
-    min-height: 104px;
-    padding: 18px;
+    min-height: 84px;
+    padding: 14px;
+  }
+
+  .typing-box {
+    min-height: 110px;
   }
 
   .first-run {

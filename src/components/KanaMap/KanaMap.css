@@ -1,11 +1,11 @@
 .progress-panel {
-  margin-top: 18px;
-  padding: 24px;
+  margin-top: 12px;
+  padding: 14px;
 }
 
 .section-head {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -16,56 +16,59 @@
 
 .section-head h2 {
   margin: 0;
-  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  font-weight: 600;
   line-height: 1.1;
 }
 
 .legend {
   margin: 0;
   color: var(--muted);
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .kana-rows {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .kana-row {
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 10px;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
   align-items: center;
 }
 
 .row-label {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  border-radius: 12px;
-  background: rgba(30, 26, 20, 0.08);
+  border-radius: 9px;
+  background: rgba(30, 26, 20, 0.06);
   color: var(--muted);
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .row-kana {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 5px;
 }
 
 .kana-pill {
   display: inline-grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 13px;
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.5);
-  font-size: 1.16rem;
+  background: rgba(255, 255, 255, 0.42);
+  font-size: 1rem;
+  font-weight: 400;
 }
 
 .kana-pill.current {
@@ -75,15 +78,15 @@
 }
 
 .kana-pill.passed {
-  background: rgba(86, 124, 85, 0.18);
+  background: rgba(86, 124, 85, 0.15);
   color: #365c34;
-  border-color: rgba(86, 124, 85, 0.25);
+  border-color: rgba(86, 124, 85, 0.2);
 }
 
 .kana-pill.weak {
-  background: rgba(209, 144, 47, 0.18);
+  background: rgba(209, 144, 47, 0.15);
   color: #7b5318;
-  border-color: rgba(209, 144, 47, 0.28);
+  border-color: rgba(209, 144, 47, 0.22);
 }
 
 .kana-pill.locked {
@@ -93,7 +96,7 @@
 
 @media (max-width: 760px) {
   .progress-panel {
-    padding: 18px;
+    padding: 16px;
   }
 
   .section-head {
