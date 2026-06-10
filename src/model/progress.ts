@@ -152,6 +152,18 @@ export function getUnlockedKana(
   return getKanaOrder(mode).slice(0, progress.unlockedCountByMode[mode])
 }
 
+export function setProgressMode(
+  progress: ProgressState,
+  mode: PracticeMode,
+): ProgressState {
+  if (progress.mode === mode) return progress
+
+  return {
+    ...cloneProgressState(progress),
+    mode,
+  }
+}
+
 export function applyEvaluationToProgress(
   progress: ProgressState,
   settings: PracticeSettings,

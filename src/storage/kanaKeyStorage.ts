@@ -36,7 +36,9 @@ export function createKanaKeyStorage(storage: KeyValueStorage) {
   }
 }
 
-export const browserKanaKeyStorage = createKanaKeyStorage(localStorage)
+export function createBrowserKanaKeyStorage() {
+  return createKanaKeyStorage(localStorage)
+}
 
 function readJson<T>(storage: KeyValueStorage, key: string): T | null {
   try {

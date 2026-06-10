@@ -24,7 +24,6 @@ export const App = defineComponent(() => {
     accuracyPercent,
     currentAppearances,
     dailyProgress,
-    inputState,
     kanaFont,
     kanaPills,
     lastEvaluation,
@@ -45,24 +44,9 @@ export const App = defineComponent(() => {
     focusTypingBox()
   }
 
-  function clearInput() {
-    store.clearInput()
-    focusTypingBox()
-  }
-
-  function submitBatch() {
-    store.submitBatch()
-    focusTypingBox()
-  }
-
   function resetProgress() {
     if (!confirm('Reset all KanaKey progress? Settings will be kept.')) return
     store.resetProgress()
-    focusTypingBox()
-  }
-
-  function endComposition(value: string) {
-    store.endComposition(value)
     focusTypingBox()
   }
 
@@ -82,19 +66,12 @@ export const App = defineComponent(() => {
           warningMessages={warningMessages.value}
           typingBox={typingBox}
           currentKana={summary.value.current}
-          compositionText={inputState.value.compositionText}
-          isComposing={inputState.value.isComposing}
           targetKpm={settings.value.targetKpm}
           targetAccuracyPercent={accuracyPercent.value}
           passMeter={passMeter.value}
           lastEvaluation={lastEvaluation.value}
           outcomeMessage={outcomeMessage.value}
-          onSubmit={submitBatch}
-          onClear={clearInput}
-          onCommitInput={commitInput}
-          onCompositionStart={store.startComposition}
-          onCompositionUpdate={store.updateComposition}
-          onCompositionEnd={endComposition}
+          commitInput={commitInput}
         />
 
         <SettingsPanel

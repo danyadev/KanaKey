@@ -19,7 +19,9 @@ export function createKanaFontStorage(storage: KeyValueStorage) {
   }
 }
 
-export const browserKanaFontStorage = createKanaFontStorage(localStorage)
+export function createBrowserKanaFontStorage() {
+  return createKanaFontStorage(localStorage)
+}
 
 function isKanaFontChoice(value: unknown): value is KanaFontChoice {
   return typeof value === 'string' && KANA_FONT_CHOICES.has(value as KanaFontChoice)

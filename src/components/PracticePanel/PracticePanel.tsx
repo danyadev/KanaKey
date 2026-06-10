@@ -1,13 +1,11 @@
-import { defineComponent } from 'vue'
+import { computed, defineComponent, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 
 import type { BatchEvaluation } from '../../model/evaluation'
-import {
-  getCurrentWordRemainder,
-  shouldHandlePracticeShortcut,
-} from '../../model/inputSurface'
+import { getCurrentWordRemainder } from '../../model/inputSurface'
 import type { SurfaceUnitView, SurfaceWordView } from '../../model/inputSurface'
 import './PracticePanel.css'
+import { getLastRomaji, romajiToKana } from "../../model/kana.ts";
 
 export type PassMeter = {
   kpm: number
@@ -22,125 +20,94 @@ type PracticePanelProps = {
   warningMessages: string[]
   typingBox: Ref<HTMLTextAreaElement | null>
   currentKana: string
-  compositionText: string
-  isComposing: boolean
   targetKpm: number
   targetAccuracyPercent: number
   passMeter: PassMeter
   lastEvaluation: BatchEvaluation | null
   outcomeMessage: string | null
-}
-
-type PracticePanelEmits = {
-  submit: () => void
-  clear: () => void
   commitInput: (value: string) => void
-  compositionStart: () => void
-  compositionUpdate: (value: string) => void
-  compositionEnd: (value: string) => void
 }
 
-export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEmits>((props, ctx) => {
-  function focusInput() {
-    props.typingBox.value?.focus()
-  }
+export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
+  const composingText = shallowRef('')
+  const composingKana = computed(() => romajiToKana(composingText.value))
+  const isComposing = shallowRef(false)
 
-  function consumeInput(event: Event) {
-    const input = event.target as HTMLTextAreaElement
-    if (!props.isComposing && input.value.length > 0) {
-      ctx.emit('commitInput', input.value)
-      input.value = ''
-    }
-  }
-
-  function handleCompositionUpdate(event: CompositionEvent) {
-    const input = event.target as HTMLTextAreaElement
-    const compositionText = event.data || input.value
-    const remainder = getCurrentWordRemainder(props.surfaceWords)
-
-    if (compositionText && compositionText === remainder) {
-      ctx.emit('compositionEnd', compositionText)
-      input.value = ''
+  const onKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Backspace') {
+      const lastRomaji = getLastRomaji(composingText.value)
+      composingText.value = composingText.value.slice(0, lastRomaji ? -lastRomaji.length : -1)
+      event.preventDefault()
       return
     }
 
-    ctx.emit('compositionUpdate', compositionText)
+    if (event.key === 'Enter' && !event.isComposing) {
+      submitComposedText()
+      event.preventDefault()
+      return
+    }
+
+    if (event.key.length === 1 && (event.key >= 'a' && event.key <= 'z' || event.key >= 'A' && event.key <= 'Z')) {
+      composingText.value += event.key
+      if (composingKana.value === getCurrentWordRemainder(props.surfaceWords)) {
+        submitComposedText()
+      }
+    }
   }
 
-  function handleCompositionEnd(event: CompositionEvent) {
-    const input = event.target as HTMLTextAreaElement
-    const committed = event.data || input.value
-    ctx.emit('compositionEnd', committed)
+  const onCompositionStart = () => {
+    isComposing.value = true
+  }
+
+  const onCompositionEnd = () => {
+    isComposing.value = false
+    submitComposedText()
+  }
+
+  const submitComposedText = () => {
+    const input = props.typingBox.value
+    if (!input) return
+
+    const kanaText = composingKana.value
+    if (kanaText.length === 0) return;
+
+    props.commitInput(kanaText)
+    composingText.value = ''
     input.value = ''
   }
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (!shouldHandlePracticeShortcut(event, props.isComposing)) return
-
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      ctx.emit('clear')
-      return
-    }
-
-    event.preventDefault()
-    ctx.emit('submit')
+  const focusInput = () => {
+    props.typingBox.value?.focus()
   }
 
-  function renderImeInput() {
-    return (
-      <textarea
-        ref={props.typingBox}
-        value=""
-        class={['hidden-ime-input', { composing: props.isComposing }]}
-        spellcheck={false}
-        autocomplete="off"
-        autocapitalize="off"
-        autocorrect="off"
-        onInput={consumeInput}
-        onCompositionstart={() => ctx.emit('compositionStart')}
-        onCompositionupdate={handleCompositionUpdate}
-        onCompositionend={handleCompositionEnd}
-        onKeydown={handleKeydown}
-      />
-    )
-  }
+  const renderImeInput = () => (
+    <textarea
+      ref={props.typingBox}
+      value=""
+      class={['hidden-ime-input', { composing: isComposing.value }]}
+      spellcheck={false}
+      autocomplete="off"
+      autocapitalize="off"
+      autocorrect="off"
+      onKeydown={onKeydown}
+      onCompositionstart={onCompositionStart}
+      onCompositionend={onCompositionEnd}
+    />
+  )
 
-  function renderKanaUnit(unit: SurfaceUnitView) {
-    return (
-      <span key={unit.globalIndex} class={['surface-kana', unit.status, { wrong: unit.wrong }]}>
-        {renderCompositionBubble(unit)}
-        {unit.kana}
-        {unit.status === 'current' && renderImeInput()}
-      </span>
-    )
-  }
-
-  function renderCompositionBubble(unit: SurfaceUnitView) {
-    if (unit.status !== 'current' || !props.isComposing || !props.compositionText) return null
-    return <span class="composition-bubble">{props.compositionText}</span>
-  }
-
-  function renderWord(word: SurfaceWordView, wordIndex: number) {
-    return (
-      <span key={`${word.word}-${word.index}`} class="surface-word">
-        {word.units.map(renderKanaUnit)}
-        {renderSeparator(wordIndex)}
-      </span>
-    )
-  }
-
-  function renderSeparator(wordIndex: number) {
-    const isLastWord = wordIndex >= props.surfaceWords.length - 1
-    if (!props.showWordSeparator || isLastWord) return null
-    return <span class="visual-separator" aria-hidden="true">·</span>
-  }
+  const renderKanaUnit = (unit: SurfaceUnitView) => (
+    <span key={unit.globalIndex} class={['surface-kana', unit.status, { wrong: unit.wrong }]}>
+      {unit.status === 'current' && composingKana.value && (
+        <span class="composition-bubble">{composingKana.value}</span>
+      )}
+      {unit.kana}
+      {unit.status === 'current' && renderImeInput()}
+    </span>
+  )
 
   return () => (
     <article class="practice panel">
-      <div class="practice-topline">
-        <p class="eyebrow">Practice line</p>
-      </div>
+      <p class="eyebrow">Practice line</p>
 
       <div class="pass-card">
         <div class="pass-card-head">
@@ -160,17 +127,31 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
       </div>
 
       <div class="typing-surface kana-display" aria-label="Current practice words" onClick={focusInput}>
-        {props.surfaceWords.map(renderWord)}
-        {props.surfaceWords.length === 0 && (
-          <span class="target-empty">No eligible real words yet</span>
-        )}
+        {props.surfaceWords.length === 0 && <span class="target-empty">No eligible real words yet</span>}
+
+        {props.surfaceWords.map((word, index) => (
+          <span key={`${word.word}-${word.index}`} class="surface-word">
+            {word.units.map(renderKanaUnit)}
+            {props.showWordSeparator && (index < props.surfaceWords.length - 1) && (
+              <span class="visual-separator">·</span>
+            )}
+          </span>
+        ))}
       </div>
 
       {props.warningMessages.map((message) => (
         <p key={message} class="warning">{message}</p>
       ))}
 
-      {props.lastEvaluation && <ResultStrip evaluation={props.lastEvaluation} />}
+      {props.lastEvaluation && (
+        <div class="result-strip">
+          <span>Speed <strong>{Math.round(props.lastEvaluation.kpm)}</strong> kana/min</span>
+          <span>Accuracy <strong>{Math.round(props.lastEvaluation.accuracy * 100)}</strong>%</span>
+          <span>
+            Correct <strong>{props.lastEvaluation.correctKanaCount}/{props.lastEvaluation.totalExpectedKana}</strong>
+          </span>
+        </div>
+      )}
       {props.outcomeMessage && <p class="outcome">{props.outcomeMessage}</p>}
     </article>
   )
@@ -181,33 +162,13 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
     'warningMessages',
     'typingBox',
     'currentKana',
-    'compositionText',
-    'isComposing',
     'targetKpm',
     'targetAccuracyPercent',
     'passMeter',
     'lastEvaluation',
     'outcomeMessage',
+    'commitInput',
   ],
-  emits: ['submit', 'clear', 'commitInput', 'compositionStart', 'compositionUpdate', 'compositionEnd'],
-})
-
-type ResultStripProps = {
-  evaluation: BatchEvaluation
-}
-
-const ResultStrip = defineComponent<ResultStripProps>((props) => {
-  return () => (
-    <div class="result-strip">
-      <span>Speed <strong>{Math.round(props.evaluation.kpm)}</strong> kana/min</span>
-      <span>Accuracy <strong>{Math.round(props.evaluation.accuracy * 100)}</strong>%</span>
-      <span>
-        Correct <strong>{props.evaluation.correctKanaCount}/{props.evaluation.totalExpectedKana}</strong>
-      </span>
-    </div>
-  )
-}, {
-  props: ['evaluation'],
 })
 
 type MeterRowProps = {

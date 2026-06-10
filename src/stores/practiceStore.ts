@@ -18,6 +18,7 @@ import {
   createInitialProgress,
   progressSummary,
   refreshProgressPassFlags,
+  setProgressMode,
 } from '../model/progress'
 import type { ProgressState } from '../model/progress'
 import {
@@ -28,12 +29,12 @@ import {
 import type { PracticeSettings } from '../model/settings'
 import type { WordEntry } from '../model/words'
 import {
-  browserKanaFontStorage,
+  createBrowserKanaFontStorage,
   createKanaFontStorage,
 } from '../storage/kanaFontStorage'
 import type { KanaFontChoice } from '../storage/kanaFontStorage'
 import {
-  browserKanaKeyStorage,
+  createBrowserKanaKeyStorage,
   createKanaKeyStorage,
 } from '../storage/kanaKeyStorage'
 import type { KeyValueStorage } from '../storage/kanaKeyStorage'
@@ -61,8 +62,8 @@ export type PracticeStoreInit = PracticeStoreServices & {
 const emptyBatch: BatchResult = { words: [], warnings: [] }
 
 export const usePracticeStore = defineStore('practice', () => {
-  let storage = browserKanaKeyStorage
-  let fontStorage = browserKanaFontStorage
+  let storage: ReturnType<typeof createKanaKeyStorage> | null = null
+  let fontStorage: ReturnType<typeof createKanaFontStorage> | null = null
 
   const words = shallowRef<WordEntry[]>([])
   const settings = ref<PracticeSettings>(DEFAULT_SETTINGS)
@@ -90,14 +91,14 @@ export const usePracticeStore = defineStore('practice', () => {
       storage = createKanaKeyStorage(options.keyValueStorage)
       fontStorage = createKanaFontStorage(options.keyValueStorage)
     } else {
-      storage = options.storage ?? browserKanaKeyStorage
-      fontStorage = options.fontStorage ?? browserKanaFontStorage
+      storage = options.storage ?? createBrowserKanaKeyStorage()
+      fontStorage = options.fontStorage ?? createBrowserKanaFontStorage()
     }
 
     words.value = options.words ?? words.value
-    settings.value = storage.loadSettings()
-    progress.value = storage.loadProgress(settings.value)
-    kanaFont.value = fontStorage.loadKanaFontChoice()
+    settings.value = storageService().loadSettings()
+    progress.value = storageService().loadProgress(settings.value)
+    kanaFont.value = fontStorageService().loadKanaFontChoice()
     lastEvaluation.value = null
     outcomeMessage.value = null
     regenerateBatch()
@@ -112,7 +113,7 @@ export const usePracticeStore = defineStore('practice', () => {
       progress.value = refreshProgressPassFlags(progress.value, next)
     }
 
-    progress.value.mode = next.mode
+    progress.value = setProgressMode(progress.value, next.mode)
     persistSettingsAndProgress()
     regenerateBatch()
   }
@@ -146,7 +147,7 @@ export const usePracticeStore = defineStore('practice', () => {
       currentTargetLabel(progress.value, settings.value),
       settings.value,
     )
-    storage.saveProgress(progress.value)
+    storageService().saveProgress(progress.value)
     regenerateBatch()
   }
 
@@ -170,9 +171,9 @@ export const usePracticeStore = defineStore('practice', () => {
   }
 
   function resetProgress() {
-    storage.clearProgress()
+    storageService().clearProgress()
     progress.value = createInitialProgress(settings.value)
-    storage.saveProgress(progress.value)
+    storageService().saveProgress(progress.value)
     lastEvaluation.value = null
     outcomeMessage.value = null
     regenerateBatch()
@@ -180,12 +181,22 @@ export const usePracticeStore = defineStore('practice', () => {
 
   function updateKanaFont(font: KanaFontChoice) {
     kanaFont.value = font
-    fontStorage.saveKanaFontChoice(font)
+    fontStorageService().saveKanaFontChoice(font)
   }
 
   function persistSettingsAndProgress() {
-    storage.saveSettings(settings.value)
-    storage.saveProgress(progress.value)
+    storageService().saveSettings(settings.value)
+    storageService().saveProgress(progress.value)
+  }
+
+  function storageService() {
+    storage ??= createBrowserKanaKeyStorage()
+    return storage
+  }
+
+  function fontStorageService() {
+    fontStorage ??= createBrowserKanaFontStorage()
+    return fontStorage
   }
 
   return {

@@ -56,6 +56,18 @@ describe('practice store', () => {
     expect(persisted.loadSettings().targetAccuracy).toBe(1)
   })
 
+  it('updates progress mode through an explicit transition', () => {
+    const store = usePracticeStore()
+    store.initialize({ keyValueStorage: createMapStorage(), words })
+    const previousProgress = store.progress
+
+    store.updateSettings({ mode: 'katakana' })
+
+    expect(store.progress).not.toBe(previousProgress)
+    expect(previousProgress.mode).toBe('hiragana')
+    expect(store.progress.mode).toBe('katakana')
+  })
+
   it('refreshes pass flags only for pass-related setting changes', () => {
     const store = usePracticeStore()
     store.initialize({ keyValueStorage: createMapStorage(), words })

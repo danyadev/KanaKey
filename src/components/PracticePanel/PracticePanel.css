@@ -2,7 +2,6 @@
   padding: 16px;
 }
 
-.practice-topline,
 .pass-card-head {
   display: flex;
   gap: 12px;
@@ -225,11 +224,6 @@
 @media (max-width: 760px) {
   .practice {
     padding: 16px;
-  }
-
-  .practice-topline {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .typing-surface {

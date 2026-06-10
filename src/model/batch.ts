@@ -12,11 +12,15 @@ export type BatchWarning =
     type: 'noEligibleWords'
     script: KanaPracticeScript
     targetKana: string
+    unlockedKana: string[]
+    totalTargetWords: number
   }
   | {
     type: 'duplicatedToFill'
     script: KanaPracticeScript
     targetKana: string
+    unlockedKana: string[]
+    totalTargetWords: number
     available: number
     needed: number
     duplicated: number
@@ -36,8 +40,16 @@ type ScriptBatchInput = {
   script: KanaPracticeScript
   targetKana: string
   count: number
-  eligibleWords: WordEntry[]
+  diagnostics: EligibilityDiagnostics
   random: () => number
+}
+
+export type EligibilityDiagnostics = {
+  script: KanaPracticeScript
+  targetKana: string
+  unlockedKana: string[]
+  totalTargetWords: number
+  eligibleWords: WordEntry[]
 }
 
 export function generateBatch(
@@ -54,13 +66,12 @@ export function generateBatch(
 
   const script = normalizedSettings.mode
   const targetKana = progress.currentTargetKanaByMode[script]
-  const eligibleWords = getEligibleTargetWords(words, progress, script, targetKana)
 
   return buildScriptBatch({
     script,
     targetKana,
     count: normalizedSettings.batchSize,
-    eligibleWords,
+    diagnostics: getEligibilityDiagnostics(words, progress, script, targetKana),
     random,
   })
 }
@@ -71,12 +82,27 @@ export function getEligibleTargetWords(
   script: KanaPracticeScript,
   targetKana: string,
 ): WordEntry[] {
-  const unlockedKana = new Set(getUnlockedKana(progress, script))
+  return getEligibilityDiagnostics(words, progress, script, targetKana).eligibleWords
+}
 
-  return words
+export function getEligibilityDiagnostics(
+  words: WordEntry[],
+  progress: ProgressState,
+  script: KanaPracticeScript,
+  targetKana: string,
+): EligibilityDiagnostics {
+  const unlockedKana = new Set(getUnlockedKana(progress, script))
+  const targetWords = words
     .filter((word) => matchesScript(word, script))
-    .filter((word) => isWordUnlocked(word, unlockedKana))
     .filter((word) => containsTargetKana(word, targetKana))
+
+  return {
+    script,
+    targetKana,
+    unlockedKana: [...unlockedKana],
+    totalTargetWords: targetWords.length,
+    eligibleWords: targetWords.filter((word) => isWordUnlocked(word, unlockedKana)),
+  }
 }
 
 function generateMixedBatch(
@@ -92,7 +118,7 @@ function generateMixedBatch(
       script: quota.script,
       targetKana,
       count: quota.count,
-      eligibleWords: getEligibleTargetWords(words, progress, quota.script, targetKana),
+      diagnostics: getEligibilityDiagnostics(words, progress, quota.script, targetKana),
       random,
     })
   })
@@ -130,19 +156,21 @@ function splitMixedQuota(batchSize: number, random: () => number): ScriptQuota[]
 }
 
 function buildScriptBatch(input: ScriptBatchInput): BatchResult {
-  const { script, targetKana, count, eligibleWords, random } = input
+  const { script, targetKana, count, diagnostics, random } = input
+  const { eligibleWords, totalTargetWords, unlockedKana } = diagnostics
+  const candidateWords = rankedCandidateWindow(eligibleWords, count)
 
   if (count <= 0) return { words: [], warnings: [] }
 
   if (eligibleWords.length === 0) {
     return {
       words: [],
-      warnings: [{ type: 'noEligibleWords', script, targetKana }],
+      warnings: [{ type: 'noEligibleWords', script, targetKana, unlockedKana, totalTargetWords }],
     }
   }
 
-  const uniqueWords = takeShuffled(eligibleWords, Math.min(count, eligibleWords.length), random)
-  const duplicatedWords = duplicateToCount(uniqueWords, eligibleWords, count, random)
+  const uniqueWords = takeShuffled(candidateWords, Math.min(count, candidateWords.length), random)
+  const duplicatedWords = duplicateToCount(uniqueWords, candidateWords, count, random)
   const warnings: BatchWarning[] = []
 
   if (eligibleWords.length < count) {
@@ -150,6 +178,8 @@ function buildScriptBatch(input: ScriptBatchInput): BatchResult {
       type: 'duplicatedToFill',
       script,
       targetKana,
+      unlockedKana,
+      totalTargetWords,
       available: eligibleWords.length,
       needed: count,
       duplicated: count - eligibleWords.length,
@@ -160,6 +190,10 @@ function buildScriptBatch(input: ScriptBatchInput): BatchResult {
     words: withRepetitionIds(duplicatedWords),
     warnings,
   }
+}
+
+function rankedCandidateWindow(eligibleWords: WordEntry[], count: number): WordEntry[] {
+  return eligibleWords.slice(0, Math.max(count, count * 4))
 }
 
 function duplicateToCount(

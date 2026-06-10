@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { generateBatch, getEligibleTargetWords } from './model/batch'
-import { createInitialProgress } from './model/progress'
-import { DEFAULT_SETTINGS } from './model/settings'
-import type { PracticeSettings } from './model/settings'
-import type { WordEntry } from './model/words'
-import { formatBatchWarning } from './session/practiceMessages'
-import seedWords from './words.json'
+import { generateBatch, getEligibilityDiagnostics, getEligibleTargetWords } from './batch'
+import { createInitialProgress } from './progress'
+import { DEFAULT_SETTINGS } from './settings'
+import type { PracticeSettings } from './settings'
+import type { WordEntry } from './words'
+import { formatBatchWarning } from '../session/practiceMessages'
+import seedWords from '../words.json'
 
 const settings: PracticeSettings = {
   ...DEFAULT_SETTINGS,
@@ -66,6 +66,8 @@ describe('batch generation', () => {
         type: 'duplicatedToFill',
         script: 'hiragana',
         targetKana: 'あ',
+        unlockedKana: ['あ', 'い', 'し', 'き', 'か'],
+        totalTargetWords: 1,
         available: 1,
         needed: 4,
         duplicated: 3,
@@ -107,6 +109,8 @@ describe('batch generation', () => {
         type: 'duplicatedToFill',
         script: 'katakana',
         targetKana: 'ス',
+        unlockedKana: ['ス', 'キ', 'ー', 'バ', 'パ'],
+        totalTargetWords: 1,
         available: 1,
         needed: 2,
         duplicated: 1,
@@ -142,11 +146,68 @@ describe('batch generation', () => {
     expect(eligibleWords.every((wordEntry) => wordEntry.kana.includes('ス'))).toBe(true)
   })
 
+  it('diagnoses initial hiragana あ shortage as an unlocked-kana constraint', () => {
+    const progress = createInitialProgress(settings)
+    const diagnostics = getEligibilityDiagnostics(
+      seedWords as WordEntry[],
+      progress,
+      'hiragana',
+      'あ',
+    )
+
+    expect(diagnostics.totalTargetWords).toBeGreaterThan(50)
+    expect(diagnostics.eligibleWords).toHaveLength(6)
+    expect(diagnostics.unlockedKana).toEqual(['あ', 'い', 'し', 'き', 'か'])
+  })
+
+  it('uses a ranked candidate window before shuffling eligible words', () => {
+    const progress = createInitialProgress({ ...settings, batchSize: 2 })
+    const rankedWords = [
+      word('hiragana', 'あい'),
+      word('hiragana', 'あし'),
+      word('hiragana', 'あき'),
+      word('hiragana', 'あか'),
+      word('hiragana', 'ああ'),
+      word('hiragana', 'しあい'),
+      word('hiragana', 'あかい'),
+      word('hiragana', 'あいあ'),
+      word('hiragana', 'あきあ'),
+    ]
+
+    const batch = generateBatch(rankedWords, { ...settings, batchSize: 2 }, progress, fixedRandom)
+
+    expect(batch.words.map((wordEntry) => wordEntry.kana)).not.toContain('あきあ')
+    expect(batch.warnings).toEqual([])
+  })
+
+  it('returns structured noEligibleWords warnings', () => {
+    const progress = createInitialProgress(settings)
+    const batch = generateBatch(
+      [word('hiragana', 'ある')],
+      settings,
+      progress,
+      fixedRandom,
+    )
+
+    expect(batch.words).toEqual([])
+    expect(batch.warnings).toEqual([
+      {
+        type: 'noEligibleWords',
+        script: 'hiragana',
+        targetKana: 'あ',
+        unlockedKana: ['あ', 'い', 'し', 'き', 'か'],
+        totalTargetWords: 1,
+      },
+    ])
+  })
+
   it('formats structured warnings outside the low-level batch result', () => {
     const message = formatBatchWarning({
       type: 'duplicatedToFill',
       script: 'katakana',
       targetKana: 'ス',
+      unlockedKana: ['ス', 'キ', 'ー', 'バ', 'パ'],
+      totalTargetWords: 20,
       available: 1,
       needed: 2,
       duplicated: 1,
@@ -154,6 +215,7 @@ describe('batch generation', () => {
 
     expect(message).toContain('katakana')
     expect(message).toContain('ス')
+    expect(message).toContain('unlocked kana')
     expect(message).toContain('repeated 1 word')
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 
-import { evaluateBatch, expectedText } from './model/evaluation'
+import { evaluateBatch, expectedText } from './evaluation'
 import {
   addPracticeTime,
   applyEvaluationToProgress,
@@ -12,17 +12,17 @@ import {
   normalizePracticeTime,
   refreshProgressPassFlags,
   refreshSmoothedStats,
-} from './model/progress'
-import type { KanaStats } from './model/progress'
+} from './progress'
+import type { KanaStats } from './progress'
 import {
   DEFAULT_SETTINGS,
   INITIAL_UNLOCKED_COUNT,
   REQUIRED_APPEARANCE_COUNT,
   normalizeSettings,
-} from './model/settings'
-import type { PracticeSettings } from './model/settings'
-import type { PracticeWord } from './model/words'
-import { createKanaKeyStorage } from './storage/kanaKeyStorage'
+} from './settings'
+import type { PracticeSettings } from './settings'
+import type { PracticeWord } from './words'
+import { createKanaKeyStorage } from '../storage/kanaKeyStorage'
 
 const settings: PracticeSettings = {
   ...DEFAULT_SETTINGS,

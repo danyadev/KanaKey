@@ -39,8 +39,12 @@ If the user sets a batch size larger than the available unique eligible words, d
 Batch generation should draw unique eligible words first. Only duplicate words when the relevant eligible pool
 is smaller than the requested script quota. Repeated words must receive unique repetition ids.
 
+Word data order is rank/usefulness order. Batch generation should prefer earlier words by shuffling from a
+ranked candidate window before considering later eligible words.
+
 Low-level batch generation should return structured warnings, not user-facing English strings. Format those
-warnings in the session/UI layer. Warnings should report shortages per script and target kana.
+warnings in the session/UI layer. Warnings should report shortages per script and target kana, and make the
+unlocked-kana constraint visible so users do not confuse a current eligibility shortage with a tiny dictionary.
 
 ## Practice Flow
 
@@ -146,6 +150,10 @@ During IME composition:
   shows at expected location
 - move the hidden textarea off-screen while composition is active in order to prevent the system from showing kanji suggestions
 - if composition text completes the remainder of the current word, commit that word immediately so the next word starts with fresh composition
+- if composition end commits kanji but the latest kana-only composition text exactly matches the current word
+  remainder, commit that kana text instead
+- a composition word auto-complete is one consumed transaction; the following native composition end must not
+  re-commit the same text into the next word
 
 When a word is completed, record word timing. When the batch is completed, auto-submit the attempt.
 

@@ -4,16 +4,26 @@ import type { PracticeSettings } from '../model/settings'
 
 export function formatBatchWarning(warning: BatchWarning): string {
   if (warning.type === 'noEligibleWords') {
-    return `No eligible real ${warning.script} words for ${warning.targetKana} yet.`
+    return [
+      `No ${warning.script} words for ${warning.targetKana} use only unlocked kana yet.`,
+      `There are ${warning.totalTargetWords} target words total,`,
+      `but unlocked kana are ${formatUnlockedKana(warning.unlockedKana)}.`,
+    ].join(' ')
   }
 
   const wordLabel = warning.available === 1 ? 'word' : 'words'
   const repeatLabel = warning.duplicated === 1 ? 'word' : 'words'
 
   return [
-    `Only ${warning.available} eligible ${warning.script} ${wordLabel}`,
-    `for ${warning.targetKana}; repeated ${warning.duplicated} ${repeatLabel}.`,
+    `Only ${warning.available} ${warning.script} ${wordLabel} for ${warning.targetKana}`,
+    `use only unlocked kana (${formatUnlockedKana(warning.unlockedKana)}),`,
+    `out of ${warning.totalTargetWords} target words total;`,
+    `repeated ${warning.duplicated} ${repeatLabel}.`,
   ].join(' ')
+}
+
+function formatUnlockedKana(unlockedKana: string[]): string {
+  return unlockedKana.join(' ')
 }
 
 export function buildOutcomeMessage(
