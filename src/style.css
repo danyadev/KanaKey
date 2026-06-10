@@ -44,6 +44,7 @@ body::before {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -87,7 +88,19 @@ button:disabled {
 }
 
 .kana-display {
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Yu Gothic", "Hiragino Sans", serif;
+  font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+}
+
+.kana-font-gothic .kana-display {
+  font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+}
+
+.kana-font-system .kana-display {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.kana-font-mincho .kana-display {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
 }
 
 .shell {
@@ -104,9 +117,32 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
+.section-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-head.compact {
+  align-items: center;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 @media (max-width: 760px) {
   .shell {
     width: min(100% - 20px, 680px);
     padding-top: 10px;
+  }
+
+  .section-head {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

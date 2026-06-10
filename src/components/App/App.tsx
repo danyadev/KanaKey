@@ -8,10 +8,13 @@ import type { KanaPill } from '../KanaMap/kanaRows'
 import { PracticePanel } from '../PracticePanel/PracticePanel'
 import { SettingsPanel } from '../SettingsPanel/SettingsPanel'
 import { StatsGrid } from '../StatsGrid/StatsGrid'
+import { resetPracticeDraft } from './practiceDraft'
+import { loadKanaFontChoice, saveKanaFontChoice } from './uiPrefs'
+import type { KanaFontChoice } from './uiPrefs'
 import { getKanaOrder } from '../../kana'
 import seedWords from '../../words.json'
 import { clearProgress, loadProgress, loadSettings, saveProgress, saveSettings } from '../../storage'
-import type { BatchEvaluation, BatchResult, PracticeSettings, ProgressState, WordEntry } from '../../types'
+import type { BatchEvaluation, BatchResult, PracticeMode, PracticeSettings, ProgressState, WordEntry } from '../../types'
 import {
   applyEvaluationToProgress,
   createInitialProgress,
@@ -36,8 +39,9 @@ export const App = defineComponent((_props, _ctx) => {
   const typedText = ref('')
   const startedAt = ref<number | null>(null)
   const lastEvaluation = ref<BatchEvaluation | null>(null)
-  const lastOutcomeTarget = ref<string | null>(null)
+  const outcomeMessage = ref<string | null>(null)
   const typingBox = ref<HTMLTextAreaElement | null>(null)
+  const kanaFont = ref<KanaFontChoice>(loadKanaFontChoice())
   let lastHandledSettings = normalizeSettings(settings.value)
   let lastHandledSettingsKey = serializeSettings(lastHandledSettings)
 
@@ -57,7 +61,6 @@ export const App = defineComponent((_props, _ctx) => {
     return progress.value.kanaStatsByMode[mode][target]
   })
   const recentSessions = computed(() => progress.value.sessionHistory.slice(-5).reverse())
-  const isFirstRun = computed(() => progress.value.sessionHistory.length === 0 && !lastEvaluation.value)
   const targetWords = computed(() => batch.value.words.map((word) => ({
     id: word.repetitionId,
     kana: word.kana,
@@ -78,27 +81,11 @@ export const App = defineComponent((_props, _ctx) => {
       attemptsPercent: meterPercent(attempts, settings.value.minAttemptsPerKana),
     }
   })
-  const outcomeMessage = computed(() => buildOutcomeMessage(lastEvaluation.value, lastOutcomeTarget.value, settings.value))
-  const kanaPills = computed<KanaPill[]>(() => {
-    const mode = settings.value.mode
-    const order = getKanaOrder(mode)
-    const unlockedCount = progress.value.unlockedCountByMode[mode]
-    const current = progress.value.currentTargetKanaByMode[mode]
-    const stats = progress.value.kanaStatsByMode[mode]
-
-    return order.map((kana, index) => {
-      const locked = index >= unlockedCount
-      const kanaStats = stats[kana]
-      let status = 'new'
-      if (locked) status = 'locked'
-      else if (kana === current) status = 'current'
-      else if (kanaStats?.passed) status = 'passed'
-      else if (kanaStats?.attempts > 0) status = 'weak'
-
-      return { kana, status }
-    })
-  })
-  const kanaRows = computed(() => groupKanaRows(settings.value.mode, kanaPills.value))
+  const kanaPills = computed<KanaPill[]>(() => [
+    ...buildKanaPills('hiragana'),
+    ...buildKanaPills('katakana'),
+  ])
+  const kanaRows = computed(() => groupKanaRows(kanaPills.value))
 
   watch(settings, (nextSettings) => {
     const normalized = normalizeSettings(nextSettings)
@@ -122,6 +109,10 @@ export const App = defineComponent((_props, _ctx) => {
     regenerateBatch({ focus: false })
   }, { deep: true })
 
+  watch(kanaFont, (nextFont) => {
+    saveKanaFontChoice(nextFont)
+  })
+
   onMounted(() => {
     focusTypingBox()
   })
@@ -130,13 +121,23 @@ export const App = defineComponent((_props, _ctx) => {
     if (!canSubmit.value) return
     startedAt.value ??= Date.now()
     const elapsedMs = Date.now() - startedAt.value
+    const mode = settings.value.mode
+    const previousTarget = progress.value.currentTargetKanaByMode[mode]
     const evaluation = evaluateBatch(targetText.value, typedText.value, elapsedMs)
-    lastOutcomeTarget.value = progress.value.currentTargetKanaByMode[settings.value.mode]
-    progress.value = applyEvaluationToProgress(progress.value, normalizeSettings(settings.value), evaluation, batch.value.words)
+    const normalizedSettings = normalizeSettings(settings.value)
+    progress.value = applyEvaluationToProgress(progress.value, normalizedSettings, evaluation, batch.value.words)
+    const nextTarget = progress.value.currentTargetKanaByMode[mode]
+    const targetStats = progress.value.kanaStatsByMode[mode][previousTarget]
+    outcomeMessage.value = buildOutcomeMessage({
+      evaluation,
+      previousTarget,
+      nextTarget,
+      targetAttempts: targetStats?.attempts ?? 0,
+      settings: normalizedSettings,
+    })
     lastEvaluation.value = evaluation
     saveProgress(progress.value)
-    typedText.value = ''
-    startedAt.value = null
+    resetDraft()
     regenerateBatch()
   }
 
@@ -147,9 +148,15 @@ export const App = defineComponent((_props, _ctx) => {
   }
 
   function clearInput() {
-    typedText.value = ''
-    startedAt.value = null
+    resetDraft()
     focusTypingBox()
+  }
+
+  function startNewBatch() {
+    resetDraft()
+    lastEvaluation.value = null
+    outcomeMessage.value = null
+    regenerateBatch({ focus: true })
   }
 
   function updateSettings(patch: Partial<PracticeSettings>) {
@@ -157,6 +164,10 @@ export const App = defineComponent((_props, _ctx) => {
       ...settings.value,
       ...patch,
     }
+  }
+
+  function updateKanaFont(nextFont: KanaFontChoice) {
+    kanaFont.value = nextFont
   }
 
   function updateTypedText(value: string) {
@@ -170,18 +181,48 @@ export const App = defineComponent((_props, _ctx) => {
     progress.value = createInitialProgress(settings.value)
     saveProgress(progress.value)
     lastEvaluation.value = null
-    lastOutcomeTarget.value = null
-    typedText.value = ''
-    startedAt.value = null
+    outcomeMessage.value = null
+    resetDraft()
     regenerateBatch()
+  }
+
+  function resetDraft() {
+    const draft = resetPracticeDraft()
+    typedText.value = draft.typedText
+    startedAt.value = draft.startedAt
   }
 
   function focusTypingBox() {
     nextTick(() => typingBox.value?.focus())
   }
 
+  function buildKanaPills(script: 'hiragana' | 'katakana'): KanaPill[] {
+    const order = getKanaOrder(script)
+    const progressMode = settingsModeForKanaMap(script)
+    const unlockedKana = new Set(getKanaOrder(progressMode).slice(0, progress.value.unlockedCountByMode[progressMode]))
+    const current = progress.value.currentTargetKanaByMode[progressMode]
+    const stats = progress.value.kanaStatsByMode[progressMode]
+    const showCurrent = settings.value.mode === progressMode
+
+    return order.map((kana) => {
+      const locked = !unlockedKana.has(kana)
+      const kanaStats = stats[kana]
+      let status = 'new'
+      if (locked) status = 'locked'
+      else if (showCurrent && kana === current) status = 'current'
+      else if (kanaStats?.passed) status = 'passed'
+      else if (kanaStats?.attempts > 0) status = 'weak'
+
+      return { kana, status, script }
+    })
+  }
+
+  function settingsModeForKanaMap(script: 'hiragana' | 'katakana'): PracticeMode {
+    return settings.value.mode === 'mixed' ? 'mixed' : script
+  }
+
   return () => (
-    <main class="shell">
+    <main class={['shell', `kana-font-${kanaFont.value}`]}>
       <Hero
         currentKana={summary.value.current}
         targetKpm={settings.value.targetKpm}
@@ -192,7 +233,6 @@ export const App = defineComponent((_props, _ctx) => {
         <PracticePanel
           targetWords={targetWords.value}
           warning={batch.value.warning}
-          isFirstRun={isFirstRun.value}
           typedText={typedText.value}
           canSubmit={canSubmit.value}
           typingBox={typingBox}
@@ -203,23 +243,23 @@ export const App = defineComponent((_props, _ctx) => {
           passMeter={passMeter.value}
           lastEvaluation={lastEvaluation.value}
           outcomeMessage={outcomeMessage.value}
-          regenerateBatch={regenerateBatch}
-          submitBatch={submitBatch}
-          clearInput={clearInput}
-          updateTypedText={updateTypedText}
+          onNewBatch={startNewBatch}
+          onSubmit={submitBatch}
+          onClear={clearInput}
+          onUpdate:typedText={updateTypedText}
         />
 
         <SettingsPanel
           settings={settings.value}
           accuracyPercent={accuracyPercent.value}
-          updateSettings={updateSettings}
-          setAccuracyPercent={(value) => { accuracyPercent.value = value }}
-          resetProgress={resetProgress}
+          kanaFont={kanaFont.value}
+          onUpdate:settings={updateSettings}
+          onUpdate:kanaFont={updateKanaFont}
+          onResetProgress={resetProgress}
         />
       </section>
 
       <StatsGrid
-        mode={summary.value.mode}
         unlockedCount={summary.value.unlocked.length}
         weakCount={summary.value.weak.length}
         targetAttempts={currentStats.value?.attempts ?? 0}
@@ -246,24 +286,36 @@ function targetSettingsChanged(previous: PracticeSettings, next: PracticeSetting
     || previous.smoothingWindow !== next.smoothingWindow
 }
 
-function buildOutcomeMessage(
-  evaluation: BatchEvaluation | null,
-  targetKana: string | null,
-  settings: PracticeSettings,
-): string | null {
-  if (!evaluation) return null
+type BuildOutcomeMessageInput = {
+  evaluation: BatchEvaluation
+  previousTarget: string
+  nextTarget: string
+  targetAttempts: number
+  settings: PracticeSettings
+}
+
+function buildOutcomeMessage(input: BuildOutcomeMessageInput): string {
+  const { evaluation, previousTarget, nextTarget, targetAttempts, settings } = input
+  if (previousTarget !== nextTarget) {
+    return `${previousTarget} passed. Next target: ${nextTarget}.`
+  }
 
   const missing: string[] = []
   if (evaluation.kpm < settings.targetKpm) {
-    missing.push(`${Math.ceil(settings.targetKpm - evaluation.kpm)} more kana/min`)
+    missing.push(`Speed needs +${Math.ceil(settings.targetKpm - evaluation.kpm)} kana/min.`)
   }
   if (evaluation.accuracy < settings.targetAccuracy) {
-    missing.push(`${Math.ceil((settings.targetAccuracy - evaluation.accuracy) * 100)}% more accuracy`)
+    missing.push(`Accuracy needs +${Math.ceil((settings.targetAccuracy - evaluation.accuracy) * 100)}%.`)
   }
 
-  if (missing.length === 0) {
-    return `${targetKana ?? 'Target'} improved: speed and accuracy were above target for this batch.`
+  if (missing.length > 0) {
+    return `Almost. ${missing.join(' ')}`
   }
 
-  return `${targetKana ?? 'Target'} needs ${missing.join(' and ')} before it counts as stable.`
+  const attemptsMissing = Math.max(0, settings.minAttemptsPerKana - targetAttempts)
+  if (attemptsMissing > 0) {
+    return `Good round. ${previousTarget} needs ${attemptsMissing} more stable attempts.`
+  }
+
+  return `Good round. Keep going on ${previousTarget}.`
 }

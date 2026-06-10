@@ -1,13 +1,21 @@
-import type { PracticeMode } from '../../types'
-
 export type KanaPill = {
   kana: string
   status: string
+  script: KanaScript
 }
 
 export type KanaRow = {
+  id: string
   label: string
+  script: KanaScript
   items: KanaPill[]
+}
+
+type KanaScript = 'hiragana' | 'katakana'
+
+type KanaRowDefinition = {
+  label: string
+  kana: string[]
 }
 
 const HIRAGANA_ROWS = [
@@ -48,13 +56,21 @@ const KATAKANA_ROWS = [
   { label: '小', kana: ['ャ', 'ュ', 'ョ', 'ッ', 'ー'] },
 ]
 
-export function groupKanaRows(mode: PracticeMode, pills: KanaPill[]): KanaRow[] {
+export function groupKanaRows(pills: KanaPill[]): KanaRow[] {
   const byKana = new Map(pills.map((pill) => [pill.kana, pill]))
-  const rows = mode === 'mixed' ? [...HIRAGANA_ROWS, ...KATAKANA_ROWS] : mode === 'hiragana' ? HIRAGANA_ROWS : KATAKANA_ROWS
 
+  return [
+    ...rowsForScript('hiragana', HIRAGANA_ROWS, byKana),
+    ...rowsForScript('katakana', KATAKANA_ROWS, byKana),
+  ]
+}
+
+function rowsForScript(script: KanaScript, rows: KanaRowDefinition[], byKana: Map<string, KanaPill>): KanaRow[] {
   return rows
     .map((row) => ({
+      id: `${script}-${row.label}`,
       label: row.label,
+      script,
       items: row.kana.map((kana) => byKana.get(kana)).filter((pill): pill is KanaPill => Boolean(pill)),
     }))
     .filter((row) => row.items.length > 0)

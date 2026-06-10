@@ -15,11 +15,11 @@ export const KanaMap = defineComponent<KanaMapProps>((props, _ctx) => {
           <p class="eyebrow">Progress</p>
           <h2>Kana map</h2>
         </div>
-        <p class="legend">passed · weak · current · locked</p>
+        <p class="legend">hiragana + katakana · passed · weak · current · locked</p>
       </div>
       <div class="kana-rows">
         {props.rows.map((row) => (
-          <div key={row.label} class="kana-row">
+          <div key={row.id} class={['kana-row', row.script]}>
             <span class="row-label kana-display">{row.label}</span>
             <div class="row-kana">
               {row.items.map((pill) => (

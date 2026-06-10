@@ -3,24 +3,6 @@
   padding: 14px;
 }
 
-.history-panel .section-head {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.history-panel .section-head.compact {
-  align-items: center;
-}
-
-.history-panel .section-head h2 {
-  margin: 0;
-  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
-  font-weight: 600;
-  line-height: 1.1;
-}
-
 .empty {
   margin: 0;
   color: var(--muted);
@@ -59,11 +41,6 @@
 @media (max-width: 760px) {
   .history-panel {
     padding: 16px;
-  }
-
-  .history-panel .section-head {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .history-item {

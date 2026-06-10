@@ -43,13 +43,18 @@ label {
   font-weight: 600;
 }
 
-input[type="number"] {
+input[type="number"],
+select {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 11px;
   background: rgba(255, 252, 245, 0.72);
   color: var(--ink);
+}
+
+select {
+  cursor: pointer;
 }
 
 .check {

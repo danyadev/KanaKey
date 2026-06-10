@@ -22,7 +22,6 @@ export type PassMeter = {
 type PracticePanelProps = {
   targetWords: PracticeTargetWord[]
   warning: string | null
-  isFirstRun: boolean
   typedText: string
   canSubmit: boolean
   typingBox: Ref<HTMLTextAreaElement | null>
@@ -33,21 +32,27 @@ type PracticePanelProps = {
   passMeter: PassMeter
   lastEvaluation: BatchEvaluation | null
   outcomeMessage: string | null
-  regenerateBatch: () => void
-  submitBatch: () => void
-  clearInput: () => void
-  updateTypedText: (value: string) => void
 }
 
-export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) => {
-  return () => (
-    <article class="practice panel">
+type PracticePanelEmits = {
+  newBatch: () => void
+  submit: () => void
+  clear: () => void
+  'update:typedText': (value: string) => void
+}
+
+export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEmits>((props, ctx) => {
+  return () => {
+    const hasSyntheticWords = props.targetWords.some((word) => word.synthetic)
+
+    return (
+      <article class="practice panel">
       <div class="practice-topline">
         <div>
           <p class="eyebrow">Practice line</p>
           <p class="practice-note">Use your Japanese IME. Type the kana line exactly, then press Ctrl/⌘+Enter.</p>
         </div>
-        <button type="button" class="ghost" onClick={() => props.regenerateBatch()}>New batch</button>
+        <button type="button" class="ghost" onClick={() => ctx.emit('newBatch')}>New batch</button>
       </div>
 
       <div class="target-line kana-display" aria-label="Current practice words">
@@ -57,13 +62,7 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) =
         {props.targetWords.length === 0 && <span class="target-empty">No unlocked words yet</span>}
       </div>
 
-      {props.isFirstRun && (
-        <ol class="first-run">
-          <li>Enable a Japanese IME.</li>
-          <li>Type kana directly into the box.</li>
-          <li>Submit with Ctrl/⌘+Enter.</li>
-        </ol>
-      )}
+      {hasSyntheticWords && <p class="synthetic-note">Blue chunks are generated for kana coverage.</p>}
 
       {props.warning && <p class="warning">{props.warning}</p>}
 
@@ -74,22 +73,22 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) =
         spellcheck={false}
         autocomplete="off"
         placeholder="Type here: あい　あお　うえ"
-        onInput={(event) => props.updateTypedText((event.target as HTMLTextAreaElement).value)}
+        onInput={(event) => ctx.emit('update:typedText', (event.target as HTMLTextAreaElement).value)}
         onKeydown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault()
-            props.clearInput()
+            ctx.emit('clear')
           }
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
-            props.submitBatch()
+            ctx.emit('submit')
           }
         }}
       />
 
       <div class="actions">
-        <button type="button" class="primary" disabled={!props.canSubmit} onClick={props.submitBatch}>Submit batch</button>
-        <button type="button" class="ghost" disabled={props.typedText.length === 0} onClick={props.clearInput}>Clear</button>
+        <button type="button" class="primary" disabled={!props.canSubmit} onClick={() => ctx.emit('submit')}>Submit batch</button>
+        <button type="button" class="ghost" disabled={props.typedText.length === 0} onClick={() => ctx.emit('clear')}>Clear</button>
         <p class="hint">Escape clears input. Spaces and Japanese spaces compare the same.</p>
       </div>
 
@@ -112,13 +111,13 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) =
       )}
 
       {props.outcomeMessage && <p class="outcome">{props.outcomeMessage}</p>}
-    </article>
-  )
+      </article>
+    )
+  }
 }, {
   props: [
     'targetWords',
     'warning',
-    'isFirstRun',
     'typedText',
     'canSubmit',
     'typingBox',
@@ -129,11 +128,8 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props, _ctx) =
     'passMeter',
     'lastEvaluation',
     'outcomeMessage',
-    'regenerateBatch',
-    'submitBatch',
-    'clearInput',
-    'updateTypedText',
   ],
+  emits: ['newBatch', 'submit', 'clear', 'update:typedText'],
 })
 
 type MeterRowProps = {
