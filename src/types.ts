@@ -5,14 +5,11 @@ export type KanaScript = 'hiragana' | 'katakana' | 'mixed'
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
 
 export type WordEntry = {
-  id: string
-  kanji: string | null
+  script: KanaScript
   kana: string
-  kanaScript: KanaScript
-  synthetic?: boolean
-  meaning?: string
-  jlpt?: JlptLevel
-  tags?: string[]
+  kanji?: string
+  meaning: string
+  jlpt: JlptLevel
 }
 
 export type PracticeSettings = {

@@ -17,6 +17,7 @@ import type {
 export const STORAGE_VERSION = 2
 export const INITIAL_UNLOCKED_COUNT = 5
 export const REQUIRED_APPEARANCE_COUNT = 20
+const ELIGIBLE_PRIORITY_WINDOW_MULTIPLIER = 4
 
 export const DEFAULT_SETTINGS: PracticeSettings = {
   mode: 'hiragana',
@@ -127,7 +128,7 @@ export function getUnlockedKana(progress: ProgressState, mode: PracticeMode = pr
 
 export function matchesMode(word: WordEntry, mode: PracticeMode): boolean {
   if (mode === 'mixed') return true
-  if (word.kanaScript === mode) return true
+  if (word.script === mode) return true
   return kanaScriptFor(word.kana) === mode
 }
 
@@ -160,16 +161,17 @@ export function generateBatch(
     }
   }
 
-  let batch = takeShuffled(eligibleWords, Math.min(normalized.batchSize, eligibleWords.length), random)
+  const priorityPool = rankedWindow(eligibleWords, normalized.batchSize)
+  let batch = takeShuffled(priorityPool, Math.min(normalized.batchSize, priorityPool.length), random)
   while (batch.length < normalized.batchSize) {
-    batch.push(eligibleWords[Math.floor(random() * eligibleWords.length)])
+    batch.push(priorityPool[Math.floor(random() * priorityPool.length)])
   }
-  if (normalized.batchSize > eligibleWords.length) batch = shuffleArray(batch, random)
+  if (normalized.batchSize > priorityPool.length) batch = shuffleArray(batch, random)
 
   return {
-    words: batch.map((word, index) => ({ ...word, repetitionId: `${word.id}-${index}` })),
+    words: withRepetitionIds(batch),
     warning: normalized.batchSize > eligibleWords.length
-      ? `Duplicated ${eligibleWords.length} eligible real word${eligibleWords.length === 1 ? '' : 's'} to fill this batch.`
+      ? `Only ${eligibleWords.length} eligible real word${eligibleWords.length === 1 ? '' : 's'} for ${targetKana}; repeated ${normalized.batchSize - eligibleWords.length} word${normalized.batchSize - eligibleWords.length === 1 ? '' : 's'} to fill this batch.`
       : null,
   }
 }
@@ -228,8 +230,8 @@ export function applyEvaluationToProgress(
   words: PracticeWord[],
   now = Date.now(),
 ): ProgressState {
-  const mode = settings.mode
   const next = cloneProgressState(progress)
+  const mode = settings.mode
   const attemptNumber = next.nextAttemptNumber
   next.mode = mode
   next.nextAttemptNumber += 1
@@ -425,12 +427,13 @@ function generateMixedBatch(
     const pool = preferredPool.words.length > 0
       ? preferredPool
       : availablePools[Math.floor(random() * availablePools.length)]
-    batch.push(pool.words[Math.floor(random() * pool.words.length)])
+    const priorityPool = rankedWindow(pool.words, settings.batchSize)
+    batch.push(priorityPool[Math.floor(random() * priorityPool.length)])
   }
 
-  const duplicated = batch.length > new Set(batch.map((word) => word.id)).size
+  const duplicated = batch.length > new Set(batch.map(wordKey)).size
   return {
-    words: batch.map((word, index) => ({ ...word, repetitionId: `${word.id}-${index}` })),
+    words: withRepetitionIds(batch),
     warning: duplicated ? 'Duplicated eligible real words to fill this mixed batch.' : null,
   }
 }
@@ -442,10 +445,13 @@ function getEligibleTargetWords(
   targetKana: string,
 ): WordEntry[] {
   return words
-    .filter((word) => !word.synthetic)
     .filter((word) => matchesMode(word, mode))
     .filter((word) => isWordUnlocked(word, unlockedKana))
     .filter((word) => containsTargetKana(word, targetKana))
+}
+
+function rankedWindow<T>(items: T[], batchSize: number): T[] {
+  return items.slice(0, Math.max(batchSize, batchSize * ELIGIBLE_PRIORITY_WINDOW_MULTIPLIER))
 }
 
 function takeShuffled<T>(items: T[], count: number, random: () => number): T[] {
@@ -459,6 +465,14 @@ function shuffleArray<T>(items: T[], random: () => number): T[] {
     ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
   }
   return shuffled
+}
+
+function withRepetitionIds(words: WordEntry[]): PracticeWord[] {
+  return words.map((word, index) => ({ ...word, repetitionId: `${wordKey(word)}-${index}` }))
+}
+
+function wordKey(word: WordEntry): string {
+  return word.kanji ? `${word.kanji}【${word.kana}】` : word.kana
 }
 
 function findWeakestKana(stats: Record<string, KanaStats>, order: string[]): string {

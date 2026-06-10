@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "import:words": "python3 scripts/import_words.py"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "6.0.7",
