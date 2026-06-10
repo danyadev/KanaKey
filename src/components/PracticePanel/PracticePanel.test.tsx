@@ -8,8 +8,6 @@ import {
   commitKanaInput,
   createInputSurfaceState,
   getSurfaceWordViews,
-  startComposition,
-  updateComposition,
 } from '../../model/inputSurface'
 import { formatBatchWarning } from '../../session/practiceMessages'
 import { PracticePanel } from './PracticePanel'
@@ -20,13 +18,33 @@ const words = [
 ]
 
 describe('PracticePanel component behavior', () => {
-  it('shows a composition bubble while composing', () => {
-    let state = createInputSurfaceState(words, 0)
-    state = updateComposition(startComposition(state), 'a')
-    const wrapper = mountPracticePanel(state)
+  it('renders the hidden IME input with browser text assistance disabled', () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('input.hidden-ime-input')
 
-    expect(wrapper.find('.composition-bubble').text()).toBe('a')
-    expect(wrapper.find('textarea.hidden-ime-input').classes()).toContain('composing')
+    expect(input.attributes('type')).toBe('text')
+    expect(input.attributes('autocomplete')).toBe('off')
+    expect(input.attributes('autocapitalize')).toBe('off')
+    expect(input.attributes('autocorrect')).toBe('off')
+    expect(input.attributes('spellcheck')).toBe('false')
+  })
+
+  it('shows a local romaji-to-kana composition bubble', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('input.hidden-ime-input')
+
+    await input.trigger('keydown', { key: 'a' })
+
+    expect(wrapper.find('.composition-bubble').text()).toBe('あ')
+  })
+
+  it('marks the hidden input while native IME composition is active', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('input.hidden-ime-input')
+
+    await input.trigger('compositionstart')
+
+    expect(input.classes()).toContain('composing')
   })
 
   it('does not render practice action buttons', () => {
@@ -46,190 +64,69 @@ describe('PracticePanel component behavior', () => {
     expect(withoutSeparator.find('.visual-separator').exists()).toBe(false)
   })
 
-  it('input events call committed text callback', async () => {
+  it('Enter commits the current local composition', async () => {
     const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('input.hidden-ime-input')
 
-    await writeKana(wrapper, 'あ')
+    await input.trigger('keydown', { key: 'a' })
+    await input.trigger('keydown', { key: 'Enter' })
 
-    expect(callbackProp(wrapper, 'commitInput')).toHaveBeenCalledWith('あ')
+    expect(commitInputProp(wrapper)).toHaveBeenCalledWith('あ')
+    expect(wrapper.find('.composition-bubble').exists()).toBe(false)
   })
 
-  it('Escape calls clear callback', async () => {
+  it('native composition end commits the current local composition', async () => {
     const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('input.hidden-ime-input')
 
-    await wrapper.find('textarea.hidden-ime-input').trigger('keydown', { key: 'Escape' })
+    await input.trigger('compositionstart')
+    await input.trigger('keydown', { key: 'a' })
+    await input.trigger('compositionend')
 
-    expect(callbackProp(wrapper, 'clear')).toHaveBeenCalledTimes(1)
+    expect(commitInputProp(wrapper)).toHaveBeenCalledWith('あ')
   })
 
-  it('Cmd or Ctrl Enter calls submit callback', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await input.trigger('keydown', { key: 'Enter', metaKey: true })
-    await input.trigger('keydown', { key: 'Enter', ctrlKey: true })
-
-    expect(callbackProp(wrapper, 'submit')).toHaveBeenCalledTimes(2)
-  })
-
-  it('composition update calls converted kana preview callback', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'a')
-
-    expect(callbackProp(wrapper, 'updateComposition').mock.calls).toEqual([['あ']])
-  })
-
-  it('composition preview leaves unfinished romaji visible', async () => {
+  it('leaves unfinished romaji visible in the preview', async () => {
     const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あかい' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
 
-    await composeRomaji(input, 'ak')
+    await typeRomaji(wrapper, 'ak')
 
-    expect(callbackProp(wrapper, 'updateComposition').mock.calls).toEqual([['あ'], ['あk']])
+    expect(wrapper.find('.composition-bubble').text()).toBe('あk')
+    expect(commitInputProp(wrapper)).not.toHaveBeenCalled()
   })
 
-  it('composition update completes when converted romaji matches the current remainder', async () => {
+  it('Backspace removes the last romaji unit from the preview', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あかい' }], 0))
+    const input = wrapper.find('input.hidden-ime-input')
+
+    await typeRomaji(wrapper, 'aka')
+    await input.trigger('keydown', { key: 'Backspace' })
+
+    expect(wrapper.find('.composition-bubble').text()).toBe('あ')
+  })
+
+  it('auto-commits when converted romaji matches the current word remainder', async () => {
     const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あか' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
 
-    await composeRomaji(input, 'aka')
+    await typeRomaji(wrapper, 'aka')
 
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['あか']])
+    expect(commitInputProp(wrapper)).toHaveBeenCalledWith('あか')
+    expect(wrapper.find('.composition-bubble').exists()).toBe(false)
   })
 
-  it('composition matching the current word remainder calls composition end callback', async () => {
-    let state = createInputSurfaceState(words, 0)
-    state = commitKanaInput(state, 'あ', 100)
-    const wrapper = mountPracticePanel(state)
-    const input = wrapper.find('textarea.hidden-ime-input')
+  it('commits word-final n as the target kana ん', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'けん' }], 0))
 
-    await composeRomaji(input, 'i')
+    await typeRomaji(wrapper, 'ken')
 
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['い']])
-  })
-
-  it('kanji composition end falls back to latest matching kana composition text', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あさ' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'asa', '朝')
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['あさ']])
-  })
-
-  it('kanji composition end accepts あか reading when IME commits 赤', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あか' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aka', '赤')
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['あか']])
-  })
-
-  it('kanji composition can recover あか from incremental romaji key events', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あか' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aka', '赤')
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['あか']])
-  })
-
-  it('kanji composition end stays wrong when kana composition text does not match', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'あさ' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'ashi')
-    await input.trigger('compositionend', { data: '足' })
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['足']])
-  })
-
-  it('compositionupdate auto-complete does not double-commit on compositionend', async () => {
-    const wrapper = mountCompositionHarness([{ kana: 'ああ' }, { kana: 'あか' }])
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-    await input.trigger('compositionend', { data: 'ああ' })
-
-    expect(currentKanaText(wrapper)).toBe('あ')
-    expect(wrapper.findAll('.surface-kana.completed')).toHaveLength(2)
-  })
-
-  it('post-composition input event does not leak consumed kana into next word', async () => {
-    const wrapper = mountCompositionHarness([{ kana: 'ああ' }, { kana: 'あか' }])
-    let input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-
-    input = wrapper.find('textarea.hidden-ime-input')
-    setTextareaValue(input, 'あ')
-    await input.trigger('input')
-
-    expect(currentKanaText(wrapper)).toBe('あ')
-    expect(wrapper.findAll('.surface-kana.completed')).toHaveLength(2)
-  })
-
-  it('post-composition input with extra text is committed explicitly', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'ああ' }, { kana: 'あか' }], 0))
-    let input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-
-    input = wrapper.find('textarea.hidden-ime-input')
-    setTextareaValue(input, 'あああ')
-    await input.trigger('input')
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['ああ']])
-    expect(callbackProp(wrapper, 'commitInput').mock.calls).toEqual([['あああ']])
-  })
-
-  it('consumed composition does not mark a different next kana wrong', async () => {
-    const wrapper = mountCompositionHarness([{ kana: 'ああ' }, { kana: 'いか' }])
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-    await input.trigger('compositionend', { data: 'ああ' })
-
-    expect(currentKanaText(wrapper)).toBe('い')
-    expect(wrapper.find('.surface-kana.current').classes()).not.toContain('wrong')
-  })
-
-  it('consumed composition does not auto-complete a duplicate next word', async () => {
-    const wrapper = mountCompositionHarness([{ kana: 'ああ' }, { kana: 'ああ' }])
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-    await input.trigger('compositionend', { data: 'ああ' })
-
-    expect(currentKanaText(wrapper)).toBe('あ')
-    expect(wrapper.findAll('.surface-kana.completed')).toHaveLength(2)
-  })
-
-  it('compositionend with same already-consumed value calls no duplicate commit', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'ああ' }, { kana: 'あか' }], 0))
-    const input = wrapper.find('textarea.hidden-ime-input')
-
-    await composeRomaji(input, 'aa')
-    await input.trigger('compositionend', { data: 'ああ' })
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['ああ']])
-  })
-
-  it('extra compositionend text beyond the current word is committed explicitly', async () => {
-    const wrapper = mountPracticePanel(createInputSurfaceState([{ kana: 'ああ' }, { kana: 'あか' }], 0))
-
-    await wrapper.find('textarea.hidden-ime-input').trigger('compositionend', { data: 'あああ' })
-
-    expect(callbackProp(wrapper, 'endComposition').mock.calls).toEqual([['あああ']])
+    expect(commitInputProp(wrapper)).toHaveBeenCalledWith('けん')
   })
 
   it('typing correct kana advances the visible cursor', async () => {
     const wrapper = mountPracticeHarness()
 
-    await writeKana(wrapper, 'あ')
+    await typeRomaji(wrapper, 'a')
+    await wrapper.find('input.hidden-ime-input').trigger('keydown', { key: 'Enter' })
 
     expect(wrapper.find('.surface-kana.completed').text()).toBe('あ')
     expect(wrapper.find('.surface-kana.current').text()).toBe('い')
@@ -238,7 +135,8 @@ describe('PracticePanel component behavior', () => {
   it('typing wrong kana marks the current kana and does not advance', async () => {
     const wrapper = mountPracticeHarness()
 
-    await writeKana(wrapper, 'お')
+    await typeRomaji(wrapper, 'o')
+    await wrapper.find('input.hidden-ime-input').trigger('keydown', { key: 'Enter' })
 
     const current = wrapper.find('.surface-kana.current')
     expect(current.text()).toBe('あ')
@@ -248,7 +146,7 @@ describe('PracticePanel component behavior', () => {
   it('completing the batch auto-submits and shows result info', async () => {
     const wrapper = mountPracticeHarness([{ kana: 'あ' }])
 
-    await writeKana(wrapper, 'あ')
+    await typeRomaji(wrapper, 'a')
 
     expect(wrapper.text()).toContain('Speed')
     expect(wrapper.text()).toContain('Accuracy')
@@ -280,19 +178,8 @@ function mountPracticePanel(
   })
 }
 
-type CallbackPropName =
-  | 'submit'
-  | 'clear'
-  | 'commitInput'
-  | 'startComposition'
-  | 'updateComposition'
-  | 'endComposition'
-
-function callbackProp(
-  wrapper: ReturnType<typeof mountPracticePanel>,
-  name: CallbackPropName,
-): ReturnType<typeof vi.fn> {
-  return wrapper.props(name) as ReturnType<typeof vi.fn>
+function commitInputProp(wrapper: ReturnType<typeof mountPracticePanel>): ReturnType<typeof vi.fn> {
+  return wrapper.props('commitInput') as ReturnType<typeof vi.fn>
 }
 
 function mountPracticeHarness(initialWords: Array<{ kana: string }> = words) {
@@ -317,58 +204,11 @@ function mountPracticeHarness(initialWords: Array<{ kana: string }> = words) {
   }))
 }
 
-function mountCompositionHarness(initialWords: Array<{ kana: string }>) {
-  return mount(defineComponent(() => {
-    const state = ref(createInputSurfaceState(initialWords, 0))
-
-    function commit(value: string) {
-      state.value = commitKanaInput(state.value, value, 100)
-    }
-
-    return () => (
-      <PracticePanel
-        {...practicePanelProps(state.value)}
-        isComposing={state.value.isComposing}
-        compositionText={state.value.compositionText}
-        startComposition={() => { state.value = startComposition(state.value) }}
-        updateComposition={(value) => { state.value = updateComposition(state.value, value) }}
-        endComposition={commit}
-      />
-    )
-  }))
-}
-
-async function writeKana(wrapper: ReturnType<typeof mount>, kana: string) {
-  const input = wrapper.find('textarea.hidden-ime-input')
-  await input.setValue(kana)
-}
-
-async function composeRomaji(
-  input: TriggerableInput,
-  romaji: string,
-  committedText?: string,
-) {
-  for (let index = 0; index < romaji.length; index += 1) {
-    await input.trigger('keydown', { key: romaji[index] })
-    if (index === 0) await input.trigger('compositionstart')
-    await input.trigger('compositionupdate', { data: romaji.slice(0, index + 1) })
+async function typeRomaji(wrapper: ReturnType<typeof mount>, romaji: string) {
+  const input = wrapper.find('input.hidden-ime-input')
+  for (const key of romaji) {
+    await input.trigger('keydown', { key })
   }
-
-  if (committedText !== undefined) {
-    await input.trigger('compositionend', { data: committedText })
-  }
-}
-
-type TriggerableInput = {
-  trigger: (eventName: string, options?: Record<string, unknown>) => Promise<void>
-}
-
-function setTextareaValue(input: { element: Element }, value: string) {
-  ;(input.element as HTMLTextAreaElement).value = value
-}
-
-function currentKanaText(wrapper: ReturnType<typeof mount>): string {
-  return wrapper.find('.surface-kana.current').text()
 }
 
 function practicePanelProps(
@@ -382,18 +222,11 @@ function practicePanelProps(
     warningMessages,
     typingBox: ref(null),
     currentKana: 'あ',
-    compositionText: state.compositionText,
-    isComposing: state.isComposing,
     targetKpm: 80,
     targetAccuracyPercent: 95,
     passMeter: { kpm: 0, accuracy: 0, kpmPercent: 0, accuracyPercent: 0 },
     lastEvaluation: null,
     outcomeMessage: null,
-    submit: vi.fn(),
-    clear: vi.fn(),
     commitInput: vi.fn(),
-    startComposition: vi.fn(),
-    updateComposition: vi.fn(),
-    endComposition: vi.fn(),
   }
 }

@@ -209,7 +209,13 @@ export function romajiToKana(text: string): string {
       continue
     }
 
-    if (char === 'n' && (!nextChar || isConsonant(nextChar))) {
+    if (char === 'n' && (nextChar === 'n' || nextChar === '\'')) {
+      output += 'ん'
+      index += 2
+      continue
+    }
+
+    if (char === 'n' && nextChar && nextChar !== 'y' && isConsonant(nextChar)) {
       output += 'ん'
       index++
       continue

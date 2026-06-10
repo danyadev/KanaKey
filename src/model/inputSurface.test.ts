@@ -6,9 +6,6 @@ import {
   createInputSurfaceState,
   getCurrentWordRemainder,
   getSurfaceWordViews,
-  shouldHandlePracticeShortcut,
-  startComposition,
-  updateComposition,
 } from './inputSurface'
 
 const words = [
@@ -27,31 +24,12 @@ describe('input surface model behavior', () => {
     expect(views[1].units[0]).toMatchObject({ kana: 'あ', status: 'future' })
   })
 
-  it('keeps required kana under the caret while composing', () => {
+  it('returns the remaining kana in the current word', () => {
     let state = createInputSurfaceState(words, 0)
-    state = startComposition(state)
-    state = updateComposition(state, 'yi')
+    state = commitKanaInput(state, 'あ', 100)
+    const views = getSurfaceWordViews(state)
 
-    const current = getSurfaceWordViews(state)[0].units[0]
-    expect(state.cursorIndex).toBe(0)
-    expect(state.isComposing).toBe(true)
-    expect(state.compositionText).toBe('yi')
-    expect(current).toMatchObject({ kana: 'あ', status: 'current' })
-  })
-
-  it('does not handle app shortcuts while IME composition is active', () => {
-    expect(shouldHandlePracticeShortcut(
-      { key: 'Enter', metaKey: true, ctrlKey: false, isComposing: false },
-      true,
-    )).toBe(false)
-    expect(shouldHandlePracticeShortcut(
-      { key: 'Escape', metaKey: false, ctrlKey: false, isComposing: true },
-      false,
-    )).toBe(false)
-    expect(shouldHandlePracticeShortcut(
-      { key: 'Enter', metaKey: false, ctrlKey: true, isComposing: false },
-      false,
-    )).toBe(true)
+    expect(getCurrentWordRemainder(views)).toBe('い')
   })
 
   it('records wrong kana, keeps the caret in place, and marks the current kana wrong', () => {
@@ -100,12 +78,5 @@ describe('input surface model behavior', () => {
       { word: 'あい', index: 0, durationMs: 300, completedAtMs: 300 },
     ])
     expect(getSurfaceWordViews(state)[1].units[0]).toMatchObject({ kana: 'あ', status: 'current' })
-  })
-
-  it('exposes the remaining current word for automatic composition completion', () => {
-    let state = createInputSurfaceState(words, 0)
-    state = commitKanaInput(state, 'あ', 100)
-
-    expect(getCurrentWordRemainder(getSurfaceWordViews(state))).toBe('い')
   })
 })

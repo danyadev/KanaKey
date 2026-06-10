@@ -1,7 +1,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export function useTypingFocus() {
-  const typingBox = ref<HTMLTextAreaElement | null>(null)
+  const typingBox = ref<HTMLInputElement | null>(null)
 
   onMounted(() => {
     focusTypingBox()

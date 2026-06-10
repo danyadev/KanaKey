@@ -7,10 +7,7 @@ import { buildInputEvaluation } from '../model/inputSurface'
 import {
   commitKanaInput,
   createInputSurfaceState,
-  endComposition as endInputComposition,
   getSurfaceWordViews,
-  startComposition as startInputComposition,
-  updateComposition as updateInputComposition,
 } from '../model/inputSurface'
 import type { InputSurfaceState } from '../model/inputSurface'
 import {
@@ -157,19 +154,6 @@ export const usePracticeStore = defineStore('practice', () => {
     if (inputState.value.completed) submitBatch(now)
   }
 
-  function startComposition() {
-    inputState.value = startInputComposition(inputState.value)
-  }
-
-  function updateComposition(value: string) {
-    inputState.value = updateInputComposition(inputState.value, value)
-  }
-
-  function endComposition(value: string) {
-    inputState.value = endInputComposition(inputState.value)
-    commitInput(value)
-  }
-
   function resetProgress() {
     storageService().clearProgress()
     progress.value = createInitialProgress(settings.value)
@@ -220,13 +204,10 @@ export const usePracticeStore = defineStore('practice', () => {
     warningMessages,
     clearInput,
     commitInput,
-    endComposition,
     initialize,
     regenerateBatch,
     resetProgress,
-    startComposition,
     submitBatch,
-    updateComposition,
     updateKanaFont,
     updateSettings,
   }

@@ -19,8 +19,6 @@ export type InputSurfaceState = {
   mistakesByIndex: number[]
   allocatedMsByIndex: number[]
   wordTimings: WordTiming[]
-  isComposing: boolean
-  compositionText: string
   wrongCurrent: boolean
   startedAt: number | null
   lastUnitStartedAt: number | null
@@ -41,8 +39,6 @@ export type SurfaceWordView = {
 
 type TargetWordInput = Array<Pick<PracticeWord, 'kana'>>
 
-type ShortcutEvent = Pick<KeyboardEvent, 'isComposing' | 'key' | 'metaKey' | 'ctrlKey'>
-
 export function createInputSurfaceState(
   words: TargetWordInput,
   now: number | null = null,
@@ -55,8 +51,6 @@ export function createInputSurfaceState(
     mistakesByIndex: Array.from({ length: units.length }, () => 0),
     allocatedMsByIndex: Array.from({ length: units.length }, () => 0),
     wordTimings: [],
-    isComposing: false,
-    compositionText: '',
     wrongCurrent: false,
     startedAt: now,
     lastUnitStartedAt: now,
@@ -65,25 +59,13 @@ export function createInputSurfaceState(
   }
 }
 
-export function startComposition(state: InputSurfaceState): InputSurfaceState {
-  return { ...state, isComposing: true, compositionText: '' }
-}
-
-export function updateComposition(state: InputSurfaceState, compositionText: string): InputSurfaceState {
-  return { ...state, isComposing: true, compositionText }
-}
-
-export function endComposition(state: InputSurfaceState): InputSurfaceState {
-  return { ...state, isComposing: false, compositionText: '' }
-}
-
 export function commitKanaInput(state: InputSurfaceState, value: string, now = Date.now()): InputSurfaceState {
   const committedUnits = splitKanaUnits(value)
   if (committedUnits.length === 0 || state.completed) {
-    return { ...state, isComposing: false, compositionText: '' }
+    return state
   }
 
-  let next = ensureStarted({ ...state, isComposing: false, compositionText: '' }, now)
+  let next = ensureStarted(state, now)
 
   for (const committedUnit of committedUnits) {
     if (next.completed) break
@@ -181,23 +163,15 @@ export function getSurfaceWordViews(state: InputSurfaceState): SurfaceWordView[]
 }
 
 export function getCurrentWordRemainder(words: SurfaceWordView[]): string {
-  for (const word of words) {
-    const currentIndex = word.units.findIndex((unit) => unit.status === 'current')
-    if (currentIndex >= 0) {
-      return word.units.slice(currentIndex).map((unit) => unit.kana).join('')
-    }
-  }
+  const word = words.find((word) => (
+    word.units.some((unit) => unit.status === 'current')
+  ))
+  if (!word) return ''
 
-  return ''
-}
-
-export function shouldHandlePracticeShortcut(
-  event: ShortcutEvent,
-  composing: boolean,
-): boolean {
-  if (composing || event.isComposing) return false
-  if (event.key === 'Escape') return true
-  return event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+  return word.units
+    .filter((unit) => unit.status !== 'completed')
+    .map((unit) => unit.kana)
+    .join('')
 }
 
 function flattenTargetWords(words: Array<Pick<PracticeWord, 'kana'>>): TargetKanaUnit[] {

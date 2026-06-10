@@ -4,8 +4,8 @@ import type { Ref } from 'vue'
 import type { BatchEvaluation } from '../../model/evaluation'
 import { getCurrentWordRemainder } from '../../model/inputSurface'
 import type { SurfaceUnitView, SurfaceWordView } from '../../model/inputSurface'
+import { getLastRomaji, romajiToKana } from '../../model/kana'
 import './PracticePanel.css'
-import { getLastRomaji, romajiToKana } from "../../model/kana.ts";
 
 export type PassMeter = {
   kpm: number
@@ -18,7 +18,7 @@ type PracticePanelProps = {
   surfaceWords: SurfaceWordView[]
   showWordSeparator: boolean
   warningMessages: string[]
-  typingBox: Ref<HTMLTextAreaElement | null>
+  typingBox: Ref<HTMLInputElement | null>
   currentKana: string
   targetKpm: number
   targetAccuracyPercent: number
@@ -42,15 +42,28 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
     }
 
     if (event.key === 'Enter' && !event.isComposing) {
-      submitComposedText()
+      submitComposedText(composingKana.value)
       event.preventDefault()
       return
     }
 
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return
+    }
+
+    event.preventDefault()
+
     if (event.key.length === 1 && (event.key >= 'a' && event.key <= 'z' || event.key >= 'A' && event.key <= 'Z')) {
       composingText.value += event.key
-      if (composingKana.value === getCurrentWordRemainder(props.surfaceWords)) {
-        submitComposedText()
+
+      // IME doesn't automatically replace 'n' at the end while composing,
+      // but we still want to automatically submit words like さん
+      const kanaText = event.key.toLowerCase() === 'n'
+        ? composingKana.value.slice(0, -1) + 'ん'
+        : composingKana.value
+
+      if (kanaText === getCurrentWordRemainder(props.surfaceWords)) {
+        submitComposedText(kanaText)
       }
     }
   }
@@ -61,15 +74,12 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
 
   const onCompositionEnd = () => {
     isComposing.value = false
-    submitComposedText()
+    submitComposedText(composingKana.value)
   }
 
-  const submitComposedText = () => {
+  const submitComposedText = (kanaText: string) => {
     const input = props.typingBox.value
-    if (!input) return
-
-    const kanaText = composingKana.value
-    if (kanaText.length === 0) return;
+    if (!input || kanaText.length === 0) return
 
     props.commitInput(kanaText)
     composingText.value = ''
@@ -81,9 +91,9 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
   }
 
   const renderImeInput = () => (
-    <textarea
+    <input
       ref={props.typingBox}
-      value=""
+      type="text"
       class={['hidden-ime-input', { composing: isComposing.value }]}
       spellcheck={false}
       autocomplete="off"

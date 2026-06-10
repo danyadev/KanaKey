@@ -44,8 +44,7 @@ body::before {
 
 button,
 input,
-select,
-textarea {
+select {
   font: inherit;
 }
 
