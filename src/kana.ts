@@ -1,44 +1,13 @@
 import type { PracticeMode } from './types'
 
 export const HIRAGANA_ORDER = [
-  'あ', 'い', 'う', 'え', 'お',
-  'か', 'き', 'く', 'け', 'こ',
-  'さ', 'し', 'す', 'せ', 'そ',
-  'た', 'ち', 'つ', 'て', 'と',
-  'な', 'に', 'ぬ', 'ね', 'の',
-  'は', 'ひ', 'ふ', 'へ', 'ほ',
-  'ま', 'み', 'む', 'め', 'も',
-  'や', 'ゆ', 'よ',
-  'ら', 'り', 'る', 'れ', 'ろ',
-  'わ', 'を', 'ん',
-  'が', 'ぎ', 'ぐ', 'げ', 'ご',
-  'ざ', 'じ', 'ず', 'ぜ', 'ぞ',
-  'だ', 'ぢ', 'づ', 'で', 'ど',
-  'ば', 'び', 'ぶ', 'べ', 'ぼ',
-  'ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ',
-  'ゃ', 'ゅ', 'ょ',
-  'っ',
+  'あ', 'い', 'し', 'き', 'か', 'こ', 'う', 'お', 'え', 'く', 'さ', 'つ', 'け', 'た', 'ち', 'と', 'ね', 'の', 'ほ', 'ま', 'む', 'や', 'わ', 'ん',
+  'そ', 'て', 'ぬ', 'ひ', 'ふ', 'へ', 'め', 'も', 'ゆ', 'ろ', 'ぎ', 'げ', 'で', 'せ', 'み', 'ず', 'な', 'に', 'は', 'よ', 'る', 'ら', 'り', 'ご', 'れ', 'を', 'が', 'っ', 'ざ', 'ぐ', 'じ', 'ぜ', 'ぞ', 'だ', 'ぢ', 'づ', 'ど', 'ば', 'び', 'ぶ', 'べ', 'ょ', 'ぼ', 'ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ', 'ゃ', 'ゅ',
 ] as const
 
 export const KATAKANA_ORDER = [
-  'ア', 'イ', 'ウ', 'エ', 'オ',
-  'カ', 'キ', 'ク', 'ケ', 'コ',
-  'サ', 'シ', 'ス', 'セ', 'ソ',
-  'タ', 'チ', 'ツ', 'テ', 'ト',
-  'ナ', 'ニ', 'ヌ', 'ネ', 'ノ',
-  'ハ', 'ヒ', 'フ', 'ヘ', 'ホ',
-  'マ', 'ミ', 'ム', 'メ', 'モ',
-  'ヤ', 'ユ', 'ヨ',
-  'ラ', 'リ', 'ル', 'レ', 'ロ',
-  'ワ', 'ヲ', 'ン',
-  'ガ', 'ギ', 'グ', 'ゲ', 'ゴ',
-  'ザ', 'ジ', 'ズ', 'ゼ', 'ゾ',
-  'ダ', 'ヂ', 'ヅ', 'デ', 'ド',
-  'バ', 'ビ', 'ブ', 'ベ', 'ボ',
-  'パ', 'ピ', 'プ', 'ペ', 'ポ',
-  'ャ', 'ュ', 'ョ',
-  'ッ',
-  'ー',
+  'ス', 'ー', 'ン', 'レ', 'ア', 'カ', 'ラ', 'シ', 'コ', 'テ', 'ト', 'イ', 'メ', 'ロ', 'パ', 'キ', 'ク', 'ニ', 'リ', 'ジ', 'ビ', 'ホ', 'エ', 'オ', 'ギ', 'ゲ', 'サ', 'タ', 'ツ', 'ド', 'バ', 'ヒ', 'マ', 'ム', 'ャ',
+  'ウ', 'ケ', 'セ', 'ソ', 'チ', 'ナ', 'ヌ', 'ネ', 'ノ', 'ハ', 'フ', 'ヘ', 'ミ', 'モ', 'ル', 'ヤ', 'ユ', 'ヨ', 'ワ', 'ヲ', 'ガ', 'グ', 'ゴ', 'ザ', 'ズ', 'ゼ', 'ゾ', 'ダ', 'ヂ', 'ヅ', 'デ', 'ブ', 'ベ', 'ボ', 'ピ', 'プ', 'ペ', 'ポ', 'ュ', 'ョ',
 ] as const
 
 export const HIRAGANA_RE = /^[ぁ-ゖ]+$/u
@@ -47,7 +16,7 @@ export const KATAKANA_RE = /^[ァ-ヺー]+$/u
 export function getKanaOrder(mode: PracticeMode): string[] {
   if (mode === 'hiragana') return [...HIRAGANA_ORDER]
   if (mode === 'katakana') return [...KATAKANA_ORDER]
-  return [...HIRAGANA_ORDER, ...KATAKANA_ORDER]
+  return interleaveOrders(HIRAGANA_ORDER, KATAKANA_ORDER)
 }
 
 export function splitKanaUnits(value: string): string[] {
@@ -58,4 +27,14 @@ export function kanaScriptFor(value: string): PracticeMode | 'mixed' {
   if (HIRAGANA_RE.test(value)) return 'hiragana'
   if (KATAKANA_RE.test(value)) return 'katakana'
   return 'mixed'
+}
+
+function interleaveOrders(left: readonly string[], right: readonly string[]): string[] {
+  const result: string[] = []
+  const maxLength = Math.max(left.length, right.length)
+  for (let index = 0; index < maxLength; index += 1) {
+    if (left[index]) result.push(left[index])
+    if (right[index]) result.push(right[index])
+  }
+  return result
 }

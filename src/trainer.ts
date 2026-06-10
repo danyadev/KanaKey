@@ -2,27 +2,30 @@ import { getKanaOrder, kanaScriptFor, splitKanaUnits } from './kana'
 import type {
   BatchEvaluation,
   BatchResult,
+  KanaAttempt,
   KanaStats,
   PracticeMode,
   PracticeSettings,
+  PracticeTimeState,
   PracticeWord,
   ProgressState,
   SessionResult,
   WordEntry,
+  WordTiming,
 } from './types'
 
-export const STORAGE_VERSION = 1
+export const STORAGE_VERSION = 2
 
 export const DEFAULT_SETTINGS: PracticeSettings = {
   mode: 'hiragana',
-  batchSize: 10,
-  initialUnlockedCount: 5,
+  batchSize: 3,
+  initialUnlockedCount: 12,
   targetKpm: 80,
   targetAccuracy: 0.95,
-  minAttemptsPerKana: 3,
-  smoothingWindow: 5,
-  doubleWords: false,
-  shuffleDoubledWords: false,
+  requiredAppearanceCount: 20,
+  smoothingAppearanceCount: 20,
+  dailyPracticeMinutesGoal: 10,
+  visualSeparator: '·',
 }
 
 export const JAPANESE_SPACE = '　'
@@ -31,10 +34,10 @@ export function createEmptyKanaStats(kana: string): KanaStats {
   return {
     kana,
     attempts: 0,
-    exposures: 0,
+    appearances: 0,
     correct: 0,
     incorrect: 0,
-    recentAttempts: [],
+    history: [],
     smoothedKpm: 0,
     smoothedAccuracy: 0,
     passed: false,
@@ -44,23 +47,28 @@ export function createEmptyKanaStats(kana: string): KanaStats {
 
 export function normalizeSettings(input: Partial<PracticeSettings> = {}): PracticeSettings {
   const mode = isPracticeMode(input.mode) ? input.mode : DEFAULT_SETTINGS.mode
-  const settings = { ...DEFAULT_SETTINGS, ...input, mode }
-  const doubleWords = typeof input.doubleWords === 'boolean' ? input.doubleWords : DEFAULT_SETTINGS.doubleWords
-  const shuffleDoubledWords = typeof input.shuffleDoubledWords === 'boolean'
-    ? input.shuffleDoubledWords
-    : DEFAULT_SETTINGS.shuffleDoubledWords
+  const visualSeparator = typeof input.visualSeparator === 'string' && input.visualSeparator.length <= 4
+    ? input.visualSeparator
+    : DEFAULT_SETTINGS.visualSeparator
 
   return {
-    ...settings,
     mode,
-    batchSize: clampInteger(settings.batchSize, 1, 50),
-    initialUnlockedCount: clampInteger(settings.initialUnlockedCount, 1, getKanaOrder(mode).length),
-    targetKpm: clampInteger(settings.targetKpm, 1, 400),
-    targetAccuracy: clampNumber(settings.targetAccuracy, 0.5, 1),
-    minAttemptsPerKana: clampInteger(settings.minAttemptsPerKana, 1, 20),
-    smoothingWindow: clampInteger(settings.smoothingWindow, 1, 20),
-    doubleWords,
-    shuffleDoubledWords,
+    batchSize: clampInteger(input.batchSize ?? DEFAULT_SETTINGS.batchSize, 1, 50),
+    initialUnlockedCount: clampInteger(input.initialUnlockedCount ?? DEFAULT_SETTINGS.initialUnlockedCount, 1, getKanaOrder(mode).length),
+    targetKpm: clampInteger(input.targetKpm ?? DEFAULT_SETTINGS.targetKpm, 1, 400),
+    targetAccuracy: clampNumber(input.targetAccuracy ?? DEFAULT_SETTINGS.targetAccuracy, 0.5, 1),
+    requiredAppearanceCount: clampInteger(
+      input.requiredAppearanceCount ?? readLegacyNumber(input, 'minAttemptsPerKana') ?? DEFAULT_SETTINGS.requiredAppearanceCount,
+      1,
+      500,
+    ),
+    smoothingAppearanceCount: clampInteger(
+      input.smoothingAppearanceCount ?? readLegacyNumber(input, 'smoothingWindow') ?? DEFAULT_SETTINGS.smoothingAppearanceCount,
+      1,
+      500,
+    ),
+    dailyPracticeMinutesGoal: clampInteger(input.dailyPracticeMinutesGoal ?? DEFAULT_SETTINGS.dailyPracticeMinutesGoal, 1, 240),
+    visualSeparator,
   }
 }
 
@@ -69,22 +77,24 @@ export function createInitialProgress(settings: PracticeSettings = DEFAULT_SETTI
   const modes: PracticeMode[] = ['hiragana', 'katakana', 'mixed']
   const unlockedCountByMode = {} as ProgressState['unlockedCountByMode']
   const currentTargetKanaByMode = {} as ProgressState['currentTargetKanaByMode']
-  const kanaStatsByMode = {} as ProgressState['kanaStatsByMode']
+  const kanaStats: Record<string, KanaStats> = {}
 
   for (const mode of modes) {
     const order = getKanaOrder(mode)
     const unlockedCount = Math.min(normalized.initialUnlockedCount, order.length)
     unlockedCountByMode[mode] = unlockedCount
     currentTargetKanaByMode[mode] = order[0]
-    kanaStatsByMode[mode] = Object.fromEntries(order.map((kana) => [kana, createEmptyKanaStats(kana)]))
+    for (const kana of order) kanaStats[kana] ??= createEmptyKanaStats(kana)
   }
 
   return {
     mode: normalized.mode,
     unlockedCountByMode,
     currentTargetKanaByMode,
-    kanaStatsByMode,
+    kanaStats,
     sessionHistory: [],
+    practiceTime: normalizePracticeTime(null),
+    nextAttemptNumber: 1,
   }
 }
 
@@ -92,7 +102,7 @@ export function ensureProgress(raw: unknown, settings: PracticeSettings): Progre
   const fallback = createInitialProgress(settings)
   if (!raw || typeof raw !== 'object') return fallback
 
-  const candidate = raw as Partial<ProgressState>
+  const candidate = raw as Partial<ProgressState> & LegacyProgressState
   const progress = createInitialProgress(settings)
   const modes: PracticeMode[] = ['hiragana', 'katakana', 'mixed']
   progress.mode = isPracticeMode(candidate.mode) ? candidate.mode : settings.mode
@@ -108,16 +118,18 @@ export function ensureProgress(raw: unknown, settings: PracticeSettings): Progre
 
     const inputTarget = candidate.currentTargetKanaByMode?.[mode]
     progress.currentTargetKanaByMode[mode] = order.includes(inputTarget ?? '') ? inputTarget! : order[0]
+  }
 
-    const inputStats = candidate.kanaStatsByMode?.[mode] ?? {}
-    progress.kanaStatsByMode[mode] = Object.fromEntries(
-      order.map((kana) => [kana, normalizeKanaStats(kana, inputStats[kana], settings)]),
-    )
+  const mergedRawStats = collectRawKanaStats(candidate)
+  for (const kana of Object.keys(progress.kanaStats)) {
+    progress.kanaStats[kana] = normalizeKanaStats(kana, mergedRawStats[kana], settings)
   }
 
   progress.sessionHistory = Array.isArray(candidate.sessionHistory)
-    ? candidate.sessionHistory.slice(-100)
+    ? candidate.sessionHistory.map(normalizeSessionResult).filter(Boolean).slice(-100) as SessionResult[]
     : []
+  progress.practiceTime = normalizePracticeTime(candidate.practiceTime)
+  progress.nextAttemptNumber = clampInteger(candidate.nextAttemptNumber ?? inferNextAttemptNumber(progress.kanaStats), 1, 1_000_000_000)
 
   return progress
 }
@@ -146,46 +158,34 @@ export function generateBatch(
   progress: ProgressState,
   random: () => number = Math.random,
 ): BatchResult {
-  const mode = settings.mode
+  const normalized = normalizeSettings(settings)
+  const mode = normalized.mode
   const unlockedKana = new Set(getUnlockedKana(progress, mode))
   const targetKana = progress.currentTargetKanaByMode[mode]
-  const modeWords = words.filter((word) => matchesMode(word, mode))
-  const unlockedWords = modeWords.filter((word) => isWordUnlocked(word, unlockedKana))
-  const targetWords = unlockedWords.filter((word) => containsTargetKana(word, targetKana))
-  const selectedIds = new Set<string>()
+  const eligibleWords = words
+    .filter((word) => !word.synthetic)
+    .filter((word) => matchesMode(word, mode))
+    .filter((word) => isWordUnlocked(word, unlockedKana))
+    .filter((word) => containsTargetKana(word, targetKana))
 
-  let batch = takeShuffled(targetWords, settings.batchSize, random)
-  for (const word of batch) selectedIds.add(word.id)
-
-  if (batch.length < settings.batchSize) {
-    const syntheticWords = generateSyntheticChunks(
-      getUnlockedKana(progress, mode),
-      targetKana,
-      mode,
-      settings.batchSize - batch.length,
-      random,
-      selectedIds,
-    )
-    batch = batch.concat(syntheticWords)
-    for (const word of syntheticWords) selectedIds.add(word.id)
+  if (eligibleWords.length === 0) {
+    return {
+      words: [],
+      warning: `No eligible real words for ${targetKana} yet. Expand the word list or unlock more kana.`,
+    }
   }
 
-  const repeatableWords = batch.length > 0 ? batch : unlockedWords
-  while (batch.length < settings.batchSize && repeatableWords.length > 0) {
-    batch.push(repeatableWords[Math.floor(random() * repeatableWords.length)])
+  let batch = takeShuffled(eligibleWords, Math.min(normalized.batchSize, eligibleWords.length), random)
+  while (batch.length < normalized.batchSize) {
+    batch.push(eligibleWords[Math.floor(random() * eligibleWords.length)])
   }
-
-  const warning = batch.length < settings.batchSize
-      ? `Only generated ${batch.length} words for this batch.`
-      : null
-
-  if (settings.doubleWords) {
-    batch = duplicateWords(batch, settings.shuffleDoubledWords, random)
-  }
+  if (normalized.batchSize > eligibleWords.length) batch = shuffleArray(batch, random)
 
   return {
     words: batch.map((word, index) => ({ ...word, repetitionId: `${word.id}-${index}` })),
-    warning,
+    warning: normalized.batchSize > eligibleWords.length
+      ? `Duplicated ${eligibleWords.length} eligible real word${eligibleWords.length === 1 ? '' : 's'} to fill this batch.`
+      : null,
   }
 }
 
@@ -202,31 +202,37 @@ export function evaluateBatch(expected: string, typed: string, elapsedMs: number
   const normalizedActual = normalizeTypedText(typed)
   const expectedUnits = splitKanaUnits(normalizedExpected)
   const actualUnits = splitKanaUnits(normalizedActual)
+  const totalExpectedKana = expectedUnits.length
+  const allocatedPerKana = totalExpectedKana === 0 ? 0 : elapsedMs / totalExpectedKana
   const perKana: BatchEvaluation['perKana'] = {}
-  let totalExpectedKana = 0
   let correctKanaCount = 0
 
   expectedUnits.forEach((unit, index) => {
-    if (unit === JAPANESE_SPACE) return
-    totalExpectedKana += 1
     const isCorrect = actualUnits[index] === unit
     if (isCorrect) correctKanaCount += 1
-    perKana[unit] ??= { exposures: 0, correct: 0, incorrect: 0 }
-    perKana[unit].exposures += 1
-    if (isCorrect) perKana[unit].correct += 1
-    else perKana[unit].incorrect += 1
+    perKana[unit] ??= { appearanceCount: 0, correctCount: 0, allocatedMs: 0 }
+    perKana[unit].appearanceCount += 1
+    perKana[unit].allocatedMs += allocatedPerKana
+    if (isCorrect) perKana[unit].correctCount += 1
   })
 
-  const elapsedMinutes = Math.max(elapsedMs, 1000) / 60000
-  return {
+  return buildEvaluation({
     expected: normalizedExpected,
     actual: normalizedActual,
     elapsedMs,
     totalExpectedKana,
     correctKanaCount,
-    kpm: totalExpectedKana === 0 ? 0 : correctKanaCount / elapsedMinutes,
-    accuracy: totalExpectedKana === 0 ? 0 : correctKanaCount / totalExpectedKana,
     perKana,
+    wordTimings: [],
+  })
+}
+
+export function buildEvaluation(input: Omit<BatchEvaluation, 'kpm' | 'accuracy'>): BatchEvaluation {
+  const elapsedMinutes = Math.max(input.elapsedMs, 1) / 60000
+  return {
+    ...input,
+    kpm: input.totalExpectedKana === 0 ? 0 : input.correctKanaCount / elapsedMinutes,
+    accuracy: input.totalExpectedKana === 0 ? 0 : input.correctKanaCount / input.totalExpectedKana,
   }
 }
 
@@ -239,27 +245,28 @@ export function applyEvaluationToProgress(
 ): ProgressState {
   const mode = settings.mode
   const next: ProgressState = structuredClone(progress)
+  const attemptNumber = next.nextAttemptNumber
   next.mode = mode
+  next.nextAttemptNumber += 1
 
   for (const [kana, attempt] of Object.entries(evaluation.perKana)) {
-    const stats = next.kanaStatsByMode[mode][kana] ?? createEmptyKanaStats(kana)
-    const accuracy = attempt.exposures === 0 ? 0 : attempt.correct / attempt.exposures
+    if (attempt.appearanceCount <= 0) continue
+    const stats = next.kanaStats[kana] ?? createEmptyKanaStats(kana)
+    const correctCount = clampInteger(attempt.correctCount, 0, attempt.appearanceCount)
     stats.attempts += 1
-    stats.exposures += attempt.exposures
-    stats.correct += attempt.correct
-    stats.incorrect += attempt.incorrect
+    stats.appearances += attempt.appearanceCount
+    stats.correct += correctCount
+    stats.incorrect += attempt.appearanceCount - correctCount
     stats.lastSeenAt = now
-    stats.recentAttempts.push({
+    stats.history.push({
       timestamp: now,
-      exposures: attempt.exposures,
-      correct: attempt.correct,
-      incorrect: attempt.incorrect,
-      kpm: evaluation.kpm,
-      accuracy,
+      attemptNumber,
+      appearanceCount: attempt.appearanceCount,
+      correctCount,
+      allocatedMs: Math.max(0, attempt.allocatedMs),
     })
-    stats.recentAttempts = stats.recentAttempts.slice(-settings.smoothingWindow)
     refreshSmoothedStats(stats, settings)
-    next.kanaStatsByMode[mode][kana] = stats
+    next.kanaStats[kana] = stats
   }
 
   const sessionResult: SessionResult = {
@@ -270,8 +277,10 @@ export function applyEvaluationToProgress(
     elapsedMs: evaluation.elapsedMs,
     kpm: evaluation.kpm,
     accuracy: evaluation.accuracy,
+    wordTimings: evaluation.wordTimings,
   }
   next.sessionHistory = [...next.sessionHistory, sessionResult].slice(-100)
+  next.practiceTime = addPracticeTime(next.practiceTime, evaluation.elapsedMs, now)
   next.currentTargetKanaByMode[mode] = chooseNextTargetKana(next, settings)
 
   return next
@@ -283,8 +292,9 @@ export function chooseNextTargetKana(progress: ProgressState, settings: Practice
   const unlocked = order.slice(0, progress.unlockedCountByMode[mode])
 
   for (const kana of unlocked) {
-    const stats = progress.kanaStatsByMode[mode][kana] ?? createEmptyKanaStats(kana)
+    const stats = progress.kanaStats[kana] ?? createEmptyKanaStats(kana)
     refreshSmoothedStats(stats, settings)
+    progress.kanaStats[kana] = stats
     if (!stats.passed) return kana
   }
 
@@ -293,35 +303,48 @@ export function chooseNextTargetKana(progress: ProgressState, settings: Practice
     return order[progress.unlockedCountByMode[mode] - 1]
   }
 
-  return findWeakestKana(progress.kanaStatsByMode[mode], order)
+  return findWeakestKana(progress.kanaStats, order)
 }
 
 export function refreshSmoothedStats(stats: KanaStats, settings: PracticeSettings): KanaStats {
-  const recent = stats.recentAttempts.slice(-settings.smoothingWindow)
-  const totalCorrect = recent.reduce((sum, attempt) => sum + attempt.correct, 0)
-  const totalExpected = recent.reduce((sum, attempt) => sum + attempt.correct + attempt.incorrect, 0)
-  const totalKpm = recent.reduce((sum, attempt) => sum + attempt.kpm, 0)
+  const recent = getSmoothingAttempts(stats.history, settings.smoothingAppearanceCount)
+  const totalCorrect = recent.reduce((sum, attempt) => sum + attempt.correctCount, 0)
+  const totalAppearances = recent.reduce((sum, attempt) => sum + attempt.appearanceCount, 0)
+  const totalAllocatedMs = recent.reduce((sum, attempt) => sum + attempt.allocatedMs, 0)
 
-  stats.smoothedAccuracy = totalExpected === 0 ? 0 : totalCorrect / totalExpected
-  stats.smoothedKpm = recent.length === 0 ? 0 : totalKpm / recent.length
+  stats.smoothedAccuracy = totalAppearances === 0 ? 0 : totalCorrect / totalAppearances
+  stats.smoothedKpm = totalCorrect === 0 ? 0 : totalCorrect / (Math.max(totalAllocatedMs, 1) / 60000)
   stats.passed = isKanaPassed(stats, settings)
   return stats
+}
+
+export function getSmoothingAttempts(history: KanaAttempt[], minimumAppearances: number): KanaAttempt[] {
+  const recent: KanaAttempt[] = []
+  let appearances = 0
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const attempt = history[index]
+    recent.unshift(attempt)
+    appearances += attempt.appearanceCount
+    if (appearances >= minimumAppearances) break
+  }
+
+  return recent
 }
 
 export function refreshProgressPassFlags(progress: ProgressState, settings: PracticeSettings): ProgressState {
   const next: ProgressState = structuredClone(progress)
 
-  for (const mode of Object.keys(next.kanaStatsByMode) as PracticeMode[]) {
-    for (const stats of Object.values(next.kanaStatsByMode[mode])) {
-      refreshSmoothedStats(stats, settings)
-    }
+  for (const stats of Object.values(next.kanaStats)) {
+    refreshSmoothedStats(stats, settings)
   }
+  next.practiceTime = normalizePracticeTime(next.practiceTime)
 
   return next
 }
 
 export function isKanaPassed(stats: KanaStats, settings: PracticeSettings): boolean {
-  return stats.attempts >= settings.minAttemptsPerKana
+  return stats.appearances >= settings.requiredAppearanceCount
     && stats.smoothedKpm >= settings.targetKpm
     && stats.smoothedAccuracy >= settings.targetAccuracy
 }
@@ -330,63 +353,40 @@ export function progressSummary(progress: ProgressState, settings: PracticeSetti
   const mode = settings.mode
   const unlocked = getUnlockedKana(progress, mode)
   const current = progress.currentTargetKanaByMode[mode]
-  const stats = progress.kanaStatsByMode[mode]
   const weak = unlocked.filter((kana) => {
-    const kanaStats = stats[kana]
-    return kanaStats.attempts > 0 && !kanaStats.passed
+    const kanaStats = progress.kanaStats[kana]
+    return kanaStats.appearances > 0 && !kanaStats.passed
   })
-  const passed = unlocked.filter((kana) => stats[kana]?.passed)
+  const passed = unlocked.filter((kana) => progress.kanaStats[kana]?.passed)
 
   return { mode, unlocked, current, weak, passed }
 }
 
-function duplicateWords(words: WordEntry[], shuffle: boolean, random: () => number): WordEntry[] {
-  const doubled = words.flatMap((word) => [word, word])
-  return shuffle ? shuffleArray(doubled, random) : doubled
-}
-
-function generateSyntheticChunks(
-  unlockedKana: string[],
-  targetKana: string,
-  mode: PracticeMode,
-  count: number,
-  random: () => number,
-  excludedIds = new Set<string>(),
-): WordEntry[] {
-  if (count <= 0 || !unlockedKana.includes(targetKana)) return []
-
-  const candidates = new Set<string>()
-  candidates.add(targetKana)
-
-  for (const kana of unlockedKana) {
-    candidates.add(`${targetKana}${kana}`)
-    candidates.add(`${kana}${targetKana}`)
+export function normalizePracticeTime(raw: unknown, now = Date.now()): PracticeTimeState {
+  const todayDate = localDateKey(now)
+  if (!raw || typeof raw !== 'object') {
+    return { todayDate, todayMs: 0, totalMs: 0 }
   }
 
-  for (let index = 0; candidates.size < count * 3 && index < unlockedKana.length * 8; index += 1) {
-    const left = unlockedKana[index % unlockedKana.length]
-    const right = unlockedKana[(index + 1) % unlockedKana.length]
-    const tail = unlockedKana[(index + 2) % unlockedKana.length]
-    candidates.add(`${left}${targetKana}${right}`)
-    candidates.add(`${targetKana}${right}${tail}`)
-    candidates.add(`${left}${right}${targetKana}`)
-  }
+  const input = raw as Partial<PracticeTimeState>
+  const storedTodayDate = typeof input.todayDate === 'string' ? input.todayDate : todayDate
+  const todayMs = Math.max(0, typeof input.todayMs === 'number' ? input.todayMs : 0)
+  const totalMs = Math.max(todayMs, typeof input.totalMs === 'number' ? input.totalMs : todayMs)
 
-  const allowedCandidates = [...candidates].filter((kana) => !excludedIds.has(`synthetic-${mode}-${kana}`))
-
-  return takeShuffled(allowedCandidates, count, random)
-    .map((kana) => createSyntheticWord(kana, mode))
-    .slice(0, count)
-}
-
-function createSyntheticWord(kana: string, mode: PracticeMode): WordEntry {
   return {
-    id: `synthetic-${mode}-${kana}`,
-    kanji: null,
-    kana,
-    kanaScript: mode,
-    synthetic: true,
-    tags: ['synthetic'],
+    todayDate,
+    todayMs: storedTodayDate === todayDate ? todayMs : 0,
+    totalMs,
+  }
+}
+
+export function addPracticeTime(practiceTime: PracticeTimeState, elapsedMs: number, now = Date.now()): PracticeTimeState {
+  const normalized = normalizePracticeTime(practiceTime, now)
+  const safeElapsedMs = Math.max(0, elapsedMs)
+  return {
+    todayDate: normalized.todayDate,
+    todayMs: normalized.todayMs + safeElapsedMs,
+    totalMs: normalized.totalMs + safeElapsedMs,
   }
 }
 
@@ -414,17 +414,120 @@ function findWeakestKana(stats: Record<string, KanaStats>, order: string[]): str
 
 function normalizeKanaStats(kana: string, raw: unknown, settings: PracticeSettings): KanaStats {
   if (!raw || typeof raw !== 'object') return createEmptyKanaStats(kana)
-  const input = raw as Partial<KanaStats>
+  const input = raw as Partial<KanaStats> & LegacyKanaStats
+  const legacyRecent = Array.isArray(input.recentAttempts) ? input.recentAttempts : []
+  const history = Array.isArray(input.history)
+    ? input.history.map(normalizeKanaAttempt).filter(Boolean) as KanaAttempt[]
+    : legacyRecent.map((attempt, index) => legacyAttemptToHistory(attempt, index + 1)).filter(Boolean) as KanaAttempt[]
+
+  const appearances = typeof input.appearances === 'number'
+    ? Math.max(0, input.appearances)
+    : Math.max(0, input.exposures ?? history.reduce((sum, attempt) => sum + attempt.appearanceCount, 0))
+  const correct = Math.max(0, input.correct ?? history.reduce((sum, attempt) => sum + attempt.correctCount, 0))
+  const incorrect = Math.max(0, input.incorrect ?? Math.max(0, appearances - correct))
+
   const stats: KanaStats = {
     ...createEmptyKanaStats(kana),
-    attempts: typeof input.attempts === 'number' ? input.attempts : 0,
-    exposures: typeof input.exposures === 'number' ? input.exposures : 0,
-    correct: typeof input.correct === 'number' ? input.correct : 0,
-    incorrect: typeof input.incorrect === 'number' ? input.incorrect : 0,
-    recentAttempts: Array.isArray(input.recentAttempts) ? input.recentAttempts.slice(-settings.smoothingWindow) : [],
+    attempts: typeof input.attempts === 'number' ? Math.max(0, input.attempts) : history.length,
+    appearances,
+    correct,
+    incorrect,
+    history,
     lastSeenAt: typeof input.lastSeenAt === 'number' ? input.lastSeenAt : null,
   }
+
+  if (stats.history.length === 0 && appearances > 0) {
+    stats.history.push({
+      timestamp: stats.lastSeenAt ?? Date.now(),
+      attemptNumber: 1,
+      appearanceCount: appearances,
+      correctCount: correct,
+      allocatedMs: 60_000,
+    })
+    stats.attempts = Math.max(stats.attempts, 1)
+  }
+
   return refreshSmoothedStats(stats, settings)
+}
+
+function normalizeKanaAttempt(raw: unknown): KanaAttempt | null {
+  if (!raw || typeof raw !== 'object') return null
+  const input = raw as Partial<KanaAttempt>
+  if (typeof input.appearanceCount !== 'number') return null
+  return {
+    timestamp: typeof input.timestamp === 'number' ? input.timestamp : Date.now(),
+    attemptNumber: typeof input.attemptNumber === 'number' ? input.attemptNumber : 1,
+    appearanceCount: Math.max(0, input.appearanceCount),
+    correctCount: clampInteger(input.correctCount ?? 0, 0, Math.max(0, input.appearanceCount)),
+    allocatedMs: Math.max(0, typeof input.allocatedMs === 'number' ? input.allocatedMs : 0),
+  }
+}
+
+function legacyAttemptToHistory(raw: unknown, attemptNumber: number): KanaAttempt | null {
+  if (!raw || typeof raw !== 'object') return null
+  const input = raw as { timestamp?: number; exposures?: number; correct?: number; incorrect?: number; kpm?: number }
+  const appearanceCount = Math.max(0, input.exposures ?? ((input.correct ?? 0) + (input.incorrect ?? 0)))
+  const correctCount = clampInteger(input.correct ?? 0, 0, appearanceCount)
+  const allocatedMs = input.kpm && input.kpm > 0 ? (correctCount / input.kpm) * 60000 : appearanceCount * 1000
+  return {
+    timestamp: typeof input.timestamp === 'number' ? input.timestamp : Date.now(),
+    attemptNumber,
+    appearanceCount,
+    correctCount,
+    allocatedMs,
+  }
+}
+
+function collectRawKanaStats(candidate: Partial<ProgressState> & LegacyProgressState): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...(candidate.kanaStats ?? {}) }
+  if (!candidate.kanaStatsByMode || typeof candidate.kanaStatsByMode !== 'object') return result
+
+  for (const statsByKana of Object.values(candidate.kanaStatsByMode)) {
+    if (!statsByKana || typeof statsByKana !== 'object') continue
+    for (const [kana, rawStats] of Object.entries(statsByKana)) {
+      result[kana] ??= rawStats
+    }
+  }
+
+  return result
+}
+
+function normalizeSessionResult(raw: unknown): SessionResult | null {
+  if (!raw || typeof raw !== 'object') return null
+  const input = raw as Partial<SessionResult>
+  if (!isPracticeMode(input.mode) || typeof input.targetKana !== 'string' || !Array.isArray(input.words)) return null
+  return {
+    timestamp: typeof input.timestamp === 'number' ? input.timestamp : Date.now(),
+    mode: input.mode,
+    targetKana: input.targetKana,
+    words: input.words.filter((word): word is string => typeof word === 'string'),
+    elapsedMs: Math.max(0, typeof input.elapsedMs === 'number' ? input.elapsedMs : 0),
+    kpm: Math.max(0, typeof input.kpm === 'number' ? input.kpm : 0),
+    accuracy: clampNumber(input.accuracy ?? 0, 0, 1),
+    wordTimings: Array.isArray(input.wordTimings) ? input.wordTimings.map(normalizeWordTiming).filter(Boolean) as WordTiming[] : [],
+  }
+}
+
+function normalizeWordTiming(raw: unknown): WordTiming | null {
+  if (!raw || typeof raw !== 'object') return null
+  const input = raw as Partial<WordTiming>
+  if (typeof input.word !== 'string' || typeof input.index !== 'number') return null
+  return {
+    word: input.word,
+    index: input.index,
+    durationMs: Math.max(0, typeof input.durationMs === 'number' ? input.durationMs : 0),
+    completedAtMs: Math.max(0, typeof input.completedAtMs === 'number' ? input.completedAtMs : 0),
+  }
+}
+
+function inferNextAttemptNumber(stats: Record<string, KanaStats>): number {
+  const maxAttempt = Object.values(stats).flatMap((kanaStats) => kanaStats.history).reduce((max, attempt) => Math.max(max, attempt.attemptNumber), 0)
+  return maxAttempt + 1
+}
+
+function readLegacyNumber(input: object, key: string): number | undefined {
+  const value = (input as Record<string, unknown>)[key]
+  return typeof value === 'number' ? value : undefined
 }
 
 function isPracticeMode(value: unknown): value is PracticeMode {
@@ -439,4 +542,21 @@ function clampInteger(value: number, min: number, max: number): number {
 function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min
   return Math.min(max, Math.max(min, value))
+}
+
+function localDateKey(timestamp: number): string {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+type LegacyKanaStats = {
+  exposures?: number
+  recentAttempts?: unknown[]
+}
+
+type LegacyProgressState = {
+  kanaStatsByMode?: Partial<Record<PracticeMode, Record<string, unknown>>>
 }

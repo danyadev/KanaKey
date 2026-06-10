@@ -31,13 +31,9 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
           Batch size
           <input value={props.settings.batchSize} type="number" min="1" max="50" onChange={(event) => updateSettings(ctx, { batchSize: readNumber(event) })} />
         </label>
-        <label class="check">
-          <input checked={props.settings.doubleWords} type="checkbox" onChange={(event) => updateSettings(ctx, { doubleWords: readChecked(event) })} />
-          Double every word
-        </label>
-        <label class="check">
-          <input checked={props.settings.shuffleDoubledWords} type="checkbox" disabled={!props.settings.doubleWords} onChange={(event) => updateSettings(ctx, { shuffleDoubledWords: readChecked(event) })} />
-          Shuffle doubled words
+        <label>
+          Visual separator
+          <input value={props.settings.visualSeparator} type="text" maxlength="4" onChange={(event) => updateSettings(ctx, { visualSeparator: readText(event) })} />
         </label>
         <label>
           Kana font
@@ -49,28 +45,32 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
         </label>
       </div>
 
-      <details class="advanced-settings">
-        <summary>Advanced targets</summary>
+      <details class="advanced-settings" open>
+        <summary>Goals</summary>
         <div class="advanced-grid">
           <label>
-            Target kana/min
+            Speed goal kana/min
             <input value={props.settings.targetKpm} type="number" min="1" max="400" onChange={(event) => updateSettings(ctx, { targetKpm: readNumber(event) })} />
           </label>
           <label>
-            Target accuracy %
+            Accuracy goal %
             <input value={props.accuracyPercent} type="number" min="50" max="100" onChange={(event) => updateSettings(ctx, { targetAccuracy: readNumber(event) / 100 })} />
+          </label>
+          <label>
+            Required appearances
+            <input value={props.settings.requiredAppearanceCount} type="number" min="1" max="500" onChange={(event) => updateSettings(ctx, { requiredAppearanceCount: readNumber(event) })} />
+          </label>
+          <label>
+            Daily practice goal minutes
+            <input value={props.settings.dailyPracticeMinutesGoal} type="number" min="1" max="240" onChange={(event) => updateSettings(ctx, { dailyPracticeMinutesGoal: readNumber(event) })} />
+          </label>
+          <label>
+            Smoothing appearances
+            <input value={props.settings.smoothingAppearanceCount} type="number" min="1" max="500" onChange={(event) => updateSettings(ctx, { smoothingAppearanceCount: readNumber(event) })} />
           </label>
           <label>
             Initial unlocked kana on reset
             <input value={props.settings.initialUnlockedCount} type="number" min="1" max="160" onChange={(event) => updateSettings(ctx, { initialUnlockedCount: readNumber(event) })} />
-          </label>
-          <label>
-            Minimum attempts per kana
-            <input value={props.settings.minAttemptsPerKana} type="number" min="1" max="20" onChange={(event) => updateSettings(ctx, { minAttemptsPerKana: readNumber(event) })} />
-          </label>
-          <label>
-            Smoothing window
-            <input value={props.settings.smoothingWindow} type="number" min="1" max="20" onChange={(event) => updateSettings(ctx, { smoothingWindow: readNumber(event) })} />
           </label>
         </div>
       </details>
@@ -91,8 +91,8 @@ function readNumber(event: Event): number {
   return Number((event.target as HTMLInputElement).value)
 }
 
-function readChecked(event: Event): boolean {
-  return (event.target as HTMLInputElement).checked
+function readText(event: Event): string {
+  return (event.target as HTMLInputElement).value
 }
 
 function readKanaFont(event: Event): KanaFontChoice {

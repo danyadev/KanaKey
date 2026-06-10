@@ -6,6 +6,8 @@ type HeroProps = {
   currentKana: string
   targetKpm: number
   accuracyPercent: number
+  dailyProgressLabel: string
+  dailyProgressPercent: number
 }
 
 export const Hero = defineComponent<HeroProps>((props, _ctx) => {
@@ -22,9 +24,13 @@ export const Hero = defineComponent<HeroProps>((props, _ctx) => {
         <span>Current target</span>
         <strong>{props.currentKana}</strong>
         <small>{props.targetKpm} kana/min · {props.accuracyPercent}% accuracy</small>
+        <div class="daily-goal" aria-label="Daily practice progress">
+          <i style={{ width: `${props.dailyProgressPercent}%` }} />
+        </div>
+        <em>{props.dailyProgressLabel}</em>
       </div>
     </section>
   )
 }, {
-  props: ['currentKana', 'targetKpm', 'accuracyPercent'],
+  props: ['currentKana', 'targetKpm', 'accuracyPercent', 'dailyProgressLabel', 'dailyProgressPercent'],
 })

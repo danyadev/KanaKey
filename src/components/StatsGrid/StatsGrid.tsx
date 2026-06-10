@@ -5,7 +5,9 @@ import './StatsGrid.css'
 type StatsGridProps = {
   unlockedCount: number
   weakCount: number
-  targetAttempts: number
+  targetAppearances: number
+  todayMinutes: string
+  totalMinutes: string
 }
 
 export const StatsGrid = defineComponent<StatsGridProps>((props, _ctx) => {
@@ -13,11 +15,13 @@ export const StatsGrid = defineComponent<StatsGridProps>((props, _ctx) => {
     <section class="stats-grid">
       <StatCard label="Unlocked" value={String(props.unlockedCount)} />
       <StatCard label="Weak kana" value={String(props.weakCount)} />
-      <StatCard label="Target attempts" value={String(props.targetAttempts)} />
+      <StatCard label="Target appearances" value={String(props.targetAppearances)} />
+      <StatCard label="Today" value={`${props.todayMinutes}m`} />
+      <StatCard label="Overall" value={`${props.totalMinutes}m`} />
     </section>
   )
 }, {
-  props: ['unlockedCount', 'weakCount', 'targetAttempts'],
+  props: ['unlockedCount', 'weakCount', 'targetAppearances', 'todayMinutes', 'totalMinutes'],
 })
 
 type StatCardProps = {

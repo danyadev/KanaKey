@@ -1,5 +1,8 @@
 # KanaKey Development Guide
 
+This guide preserves the product and engineering context needed to continue work consistently across sessions.
+Treat it as the source of truth for the app’s mechanics, UI direction, and implementation expectations.
+
 ## Product
 
 KanaKey is a compact Japanese kana typing trainer inspired by keybr.
@@ -12,7 +15,9 @@ around the current target kana, measures typing stability, and returns to weak k
 Kana unlock order is custom, not alphabetical/gojūon order.
 
 The progression line should be designed around word availability:
-each unlock step should allow enough real-word practice for the default batch size.
+early unlock steps should allow enough unique real-word practice for the default batch size.
+Some later sparse kana in the current seed list do not have enough unique words yet; for those kana,
+normal practice duplicates eligible real words until the word list is expanded.
 
 Hiragana and katakana characters are separate units, so あ and ア have separate stats.
 Mixed mode practices both scripts and updates the same shared per-kana stats depending on which characters appear in the batch.
@@ -23,7 +28,7 @@ A generated practice word must satisfy both rules:
 1. it contains the current target kana
 2. it uses only unlocked kana
 
-Default batch size should be coverable with unique real words.
+Default batch size should be coverable with unique real words for the common early progression path.
 
 If the user sets a batch size larger than the available unique eligible words, duplicate eligible words and shuffle the batch.
 
@@ -44,9 +49,8 @@ A kana passes when its smoothed recent stats meet all configured goals:
 - smoothed accuracy >= accuracy goal
 - appearances >= required appearance count
 
-Smoothing window is the latest 20 appearances of this kana by default.
-Though the window is not bound to this number, as it should consume attempts until it reaches this limit,
-which can possibly result in smaller or larger window, depending on available attempts and appearance counts in them.
+Smoothing uses the latest per-kana attempt records until they cover at least 20 appearances.
+If fewer records exist, use all available data.
 
 Store historical per-kana metrics so the app can show speed and accuracy graphs over attempts:
 - appearance count: how many times this kana appeared in an attempt
@@ -95,18 +99,37 @@ Persist in localStorage:
 
 Stored data should be normalized on load.
 
-## Input Behavior
+## Input Surface
 
-User types kana with Japanese IME.
+Practice input should behave like a keybr-style typing surface, not a visible textarea.
 
-Expected behavior:
-- Enter submits
-- Escape clears input
-- empty input cannot submit
-- focus on input on page load
-– input-related clicks keep focus on input
+Use a hidden real input for IME capture. Render target words as the visible typing UI.
+
+- words are separated by an optional visual separator like a floating dot
+- separator is visual only, not required to input
+- completed kana have muted color
+- future kana stay readable
+- current kana has a caret as underline
+- wrong input marks the required current kana red until it's written correctly
+
+During IME composition:
+
+- show composition text above the current kana as a small bubble (rectangle-ish)
+- treat composition as preview-only until committed
+
+When a word is completed, record word timing. When the batch is completed, auto-submit the attempt.
+
+This model should support future per-kana timing from committed kana-unit boundaries.
 
 ## Testing
 
-Tests should protect the learning loop and runtime-critical UI behavior.
-Prefer precise behavior tests over broad snapshots.
+Non-UI tests should cover learning logic, progression, batch generation, metrics, persistence normalization, and other pure behavior.
+
+UI tests should cover runtime-critical behavior:
+typing, submit, reset/new batch, settings changes, focus behavior, and visible goal/progress updates.
+
+Prefer behavior tests over snapshots. Add or update tests when changing mechanics.
+
+## Guide Maintenance
+
+When a requested change conflicts with this guide, update the guide together with the code.

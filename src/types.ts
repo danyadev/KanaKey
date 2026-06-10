@@ -21,32 +21,38 @@ export type PracticeSettings = {
   initialUnlockedCount: number
   targetKpm: number
   targetAccuracy: number
-  minAttemptsPerKana: number
-  smoothingWindow: number
-  doubleWords: boolean
-  shuffleDoubledWords: boolean
+  requiredAppearanceCount: number
+  smoothingAppearanceCount: number
+  dailyPracticeMinutesGoal: number
+  visualSeparator: string
 }
 
 export type KanaAttempt = {
   timestamp: number
-  exposures: number
-  correct: number
-  incorrect: number
-  kpm: number
-  accuracy: number
+  attemptNumber: number
+  appearanceCount: number
+  correctCount: number
+  allocatedMs: number
 }
 
 export type KanaStats = {
   kana: string
   attempts: number
-  exposures: number
+  appearances: number
   correct: number
   incorrect: number
-  recentAttempts: KanaAttempt[]
+  history: KanaAttempt[]
   smoothedKpm: number
   smoothedAccuracy: number
   passed: boolean
   lastSeenAt: number | null
+}
+
+export type WordTiming = {
+  word: string
+  index: number
+  durationMs: number
+  completedAtMs: number
 }
 
 export type SessionResult = {
@@ -57,14 +63,23 @@ export type SessionResult = {
   elapsedMs: number
   kpm: number
   accuracy: number
+  wordTimings: WordTiming[]
+}
+
+export type PracticeTimeState = {
+  todayDate: string
+  todayMs: number
+  totalMs: number
 }
 
 export type ProgressState = {
   mode: PracticeMode
   unlockedCountByMode: Record<PracticeMode, number>
   currentTargetKanaByMode: Record<PracticeMode, string>
-  kanaStatsByMode: Record<PracticeMode, Record<string, KanaStats>>
+  kanaStats: Record<string, KanaStats>
   sessionHistory: SessionResult[]
+  practiceTime: PracticeTimeState
+  nextAttemptNumber: number
 }
 
 export type PracticeWord = WordEntry & {
@@ -76,6 +91,12 @@ export type BatchResult = {
   warning: string | null
 }
 
+export type PerKanaEvaluation = {
+  appearanceCount: number
+  correctCount: number
+  allocatedMs: number
+}
+
 export type BatchEvaluation = {
   expected: string
   actual: string
@@ -84,5 +105,6 @@ export type BatchEvaluation = {
   correctKanaCount: number
   kpm: number
   accuracy: number
-  perKana: Record<string, { exposures: number; correct: number; incorrect: number }>
+  perKana: Record<string, PerKanaEvaluation>
+  wordTimings: WordTiming[]
 }

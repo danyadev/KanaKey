@@ -1,34 +1,32 @@
 import { defineComponent } from 'vue'
 import type { Ref } from 'vue'
 
+import { shouldHandlePracticeShortcut } from '../../inputSurface'
+import type { SurfaceWordView } from '../../inputSurface'
 import type { BatchEvaluation } from '../../types'
 import './PracticePanel.css'
-
-export type PracticeTargetWord = {
-  id: string
-  kana: string
-  synthetic?: boolean
-}
 
 export type PassMeter = {
   kpm: number
   accuracy: number
-  attempts: number
+  appearances: number
   kpmPercent: number
   accuracyPercent: number
-  attemptsPercent: number
+  appearancesPercent: number
 }
 
 type PracticePanelProps = {
-  targetWords: PracticeTargetWord[]
+  surfaceWords: SurfaceWordView[]
+  visualSeparator: string
   warning: string | null
-  typedText: string
   canSubmit: boolean
   typingBox: Ref<HTMLTextAreaElement | null>
   currentKana: string
+  compositionText: string
+  isComposing: boolean
   targetKpm: number
   targetAccuracyPercent: number
-  minAttemptsPerKana: number
+  requiredAppearanceCount: number
   passMeter: PassMeter
   lastEvaluation: BatchEvaluation | null
   outcomeMessage: string | null
@@ -38,43 +36,75 @@ type PracticePanelEmits = {
   newBatch: () => void
   submit: () => void
   clear: () => void
-  'update:typedText': (value: string) => void
+  commitInput: (value: string) => void
+  compositionStart: () => void
+  compositionUpdate: (value: string) => void
+  compositionEnd: (value: string) => void
 }
 
 export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEmits>((props, ctx) => {
-  return () => {
-    const hasSyntheticWords = props.targetWords.some((word) => word.synthetic)
+  function focusInput() {
+    props.typingBox.value?.focus()
+  }
 
-    return (
-      <article class="practice panel">
+  function consumeInput(event: Event) {
+    const input = event.target as HTMLTextAreaElement
+    if (!props.isComposing && input.value.length > 0) {
+      ctx.emit('commitInput', input.value)
+      input.value = ''
+    }
+  }
+
+  return () => (
+    <article class="practice panel">
       <div class="practice-topline">
         <div>
           <p class="eyebrow">Practice line</p>
-          <p class="practice-note">Use your Japanese IME. Type the kana line exactly, then press Ctrl/⌘+Enter.</p>
+          <p class="practice-note">Use your Japanese IME. Type the underlined kana; separators are visual only.</p>
         </div>
         <button type="button" class="ghost" onClick={() => ctx.emit('newBatch')}>New batch</button>
       </div>
 
-      <div class="target-line kana-display" aria-label="Current practice words">
-        {props.targetWords.map((word) => (
-          <span key={word.id} class={['target-word', { synthetic: word.synthetic }]}>{word.kana}</span>
+      <div class="typing-surface kana-display" aria-label="Current practice words" onClick={focusInput}>
+        {props.surfaceWords.map((word, wordIndex) => (
+          <span key={`${word.word}-${word.index}`} class="surface-word">
+            {word.units.map((unit) => (
+              <span key={unit.globalIndex} class={['surface-kana', unit.status, { wrong: unit.wrong }]}>
+                {unit.status === 'current' && props.isComposing && props.compositionText && (
+                  <span class="composition-bubble">{props.compositionText}</span>
+                )}
+                {unit.kana}
+              </span>
+            ))}
+            {wordIndex < props.surfaceWords.length - 1 && (
+              <span class="visual-separator" aria-hidden="true">{props.visualSeparator}</span>
+            )}
+          </span>
         ))}
-        {props.targetWords.length === 0 && <span class="target-empty">No unlocked words yet</span>}
+        {props.surfaceWords.length === 0 && <span class="target-empty">No eligible real words yet</span>}
       </div>
-
-      {hasSyntheticWords && <p class="synthetic-note">Blue chunks are generated for kana coverage.</p>}
 
       {props.warning && <p class="warning">{props.warning}</p>}
 
       <textarea
         ref={props.typingBox}
-        value={props.typedText}
-        class="typing-box kana-display"
+        value=""
+        class="hidden-ime-input"
         spellcheck={false}
         autocomplete="off"
-        placeholder="Type here: あい　あお　うえ"
-        onInput={(event) => ctx.emit('update:typedText', (event.target as HTMLTextAreaElement).value)}
+        autocapitalize="off"
+        aria-label="Japanese IME input capture"
+        onInput={consumeInput}
+        onCompositionstart={() => ctx.emit('compositionStart')}
+        onCompositionupdate={(event) => ctx.emit('compositionUpdate', (event as CompositionEvent).data)}
+        onCompositionend={(event) => {
+          const input = event.target as HTMLTextAreaElement
+          const committed = (event as CompositionEvent).data || input.value
+          ctx.emit('compositionEnd', committed)
+          input.value = ''
+        }}
         onKeydown={(event) => {
+          if (!shouldHandlePracticeShortcut(event, props.isComposing)) return
           if (event.key === 'Escape') {
             event.preventDefault()
             ctx.emit('clear')
@@ -87,9 +117,9 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
       />
 
       <div class="actions">
-        <button type="button" class="primary" disabled={!props.canSubmit} onClick={() => ctx.emit('submit')}>Submit batch</button>
-        <button type="button" class="ghost" disabled={props.typedText.length === 0} onClick={() => ctx.emit('clear')}>Clear</button>
-        <p class="hint">Escape clears input. Spaces and Japanese spaces compare the same.</p>
+        <button type="button" class="primary" disabled={!props.canSubmit} onClick={() => ctx.emit('submit')}>Submit completed batch</button>
+        <button type="button" class="ghost" disabled={props.surfaceWords.length === 0} onClick={() => ctx.emit('clear')}>Clear attempt</button>
+        <p class="hint">Wrong kana are recorded, discarded from progress, and must be corrected before the caret advances.</p>
       </div>
 
       <div class="pass-card">
@@ -99,7 +129,7 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
         </div>
         <MeterRow label="KPM" width={props.passMeter.kpmPercent} value={`${props.passMeter.kpm}/${props.targetKpm}`} />
         <MeterRow label="Accuracy" width={props.passMeter.accuracyPercent} value={`${props.passMeter.accuracy}%/${props.targetAccuracyPercent}%`} />
-        <MeterRow label="Attempts" width={props.passMeter.attemptsPercent} value={`${props.passMeter.attempts}/${props.minAttemptsPerKana}`} />
+        <MeterRow label="Appearances" width={props.passMeter.appearancesPercent} value={`${props.passMeter.appearances}/${props.requiredAppearanceCount}`} />
       </div>
 
       {props.lastEvaluation && (
@@ -111,25 +141,26 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
       )}
 
       {props.outcomeMessage && <p class="outcome">{props.outcomeMessage}</p>}
-      </article>
-    )
-  }
+    </article>
+  )
 }, {
   props: [
-    'targetWords',
+    'surfaceWords',
+    'visualSeparator',
     'warning',
-    'typedText',
     'canSubmit',
     'typingBox',
     'currentKana',
+    'compositionText',
+    'isComposing',
     'targetKpm',
     'targetAccuracyPercent',
-    'minAttemptsPerKana',
+    'requiredAppearanceCount',
     'passMeter',
     'lastEvaluation',
     'outcomeMessage',
   ],
-  emits: ['newBatch', 'submit', 'clear', 'update:typedText'],
+  emits: ['newBatch', 'submit', 'clear', 'commitInput', 'compositionStart', 'compositionUpdate', 'compositionEnd'],
 })
 
 type MeterRowProps = {

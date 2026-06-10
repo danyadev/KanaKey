@@ -19,33 +19,102 @@
   line-height: 1.4;
 }
 
-.target-line {
+.typing-surface {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 7px 11px;
+  gap: 10px 13px;
   align-items: center;
-  min-height: 76px;
+  min-height: 104px;
   margin-top: 12px;
-  padding: 13px 15px;
+  padding: 18px 17px;
   border: 1px solid rgba(60, 45, 26, 0.14);
-  border-radius: 14px;
+  border-radius: 16px;
   background:
     linear-gradient(rgba(60, 45, 26, 0.035) 1px, transparent 1px),
-    rgba(255, 252, 245, 0.62);
-  background-size: 100% 28px;
+    rgba(255, 252, 245, 0.68);
+  background-size: 100% 32px;
+  cursor: text;
 }
 
-.target-word {
-  display: inline-block;
+.surface-word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
   color: var(--ink);
-  font-size: clamp(1.5rem, 2.4vw, 2.4rem);
+  font-size: clamp(1.65rem, 2.7vw, 2.65rem);
   font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: 0.01em;
+  line-height: 1.18;
+  letter-spacing: 0.015em;
 }
 
-.target-word.synthetic {
+.surface-kana {
+  position: relative;
+  display: inline-block;
+  min-width: 0.72em;
+  padding: 0 1px 5px;
+  border-bottom: 2px solid transparent;
+}
+
+.surface-kana.completed {
+  color: rgba(76, 69, 58, 0.34);
+}
+
+.surface-kana.future {
+  color: var(--ink);
+}
+
+.surface-kana.current {
+  border-bottom-color: var(--sea);
+  color: var(--ink);
+}
+
+.surface-kana.current::after {
+  position: absolute;
+  right: -2px;
+  bottom: 1px;
+  left: -2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sea);
+  content: '';
+}
+
+.surface-kana.wrong {
+  color: var(--vermilion);
+}
+
+.surface-kana.wrong::after {
+  background: var(--vermilion);
+}
+
+.composition-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 3px 7px;
+  border: 1px solid rgba(47, 114, 133, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 252, 245, 0.96);
+  box-shadow: 0 8px 20px rgba(76, 47, 19, 0.12);
   color: var(--sea);
+  font-family: "Avenir Next", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.visual-separator {
+  margin-left: 11px;
+  color: rgba(76, 69, 58, 0.32);
+  font-family: "Avenir Next", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
 }
 
 .target-empty {
@@ -53,11 +122,16 @@
   font-size: 1.05rem;
 }
 
-.synthetic-note {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.35;
+.hidden-ime-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0.01;
+  resize: none;
 }
 
 .warning,
@@ -77,34 +151,6 @@
 .outcome {
   background: rgba(86, 124, 85, 0.1);
   color: #365c34;
-}
-
-.typing-box {
-  width: 100%;
-  min-height: 84px;
-  margin-top: 12px;
-  padding: 13px 14px;
-  resize: vertical;
-  border: 1px solid rgba(30, 26, 20, 0.22);
-  border-radius: 15px;
-  outline: none;
-  background: rgba(255, 252, 245, 0.72);
-  color: var(--ink);
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  font-weight: 400;
-  line-height: 1.35;
-}
-
-.typing-box:focus {
-  border-color: var(--sea);
-  box-shadow: 0 0 0 3px rgba(47, 114, 133, 0.12);
-}
-
-.typing-box::placeholder {
-  color: rgba(116, 111, 100, 0.72);
-  font-family: "Avenir Next", "Gill Sans", "Helvetica Neue", sans-serif;
-  font-size: 0.95rem;
-  font-weight: 400;
 }
 
 .actions {
@@ -138,7 +184,7 @@
 
 .meter-row {
   display: grid;
-  grid-template-columns: 72px minmax(80px, 1fr) 88px;
+  grid-template-columns: 86px minmax(80px, 1fr) 88px;
   gap: 8px;
   align-items: center;
   color: var(--muted);
@@ -196,17 +242,13 @@
     flex-direction: column;
   }
 
-  .target-line {
-    min-height: 84px;
-    padding: 14px;
-  }
-
-  .typing-box {
-    min-height: 110px;
+  .typing-surface {
+    min-height: 116px;
+    padding: 16px 14px;
   }
 
   .meter-row {
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 86px 1fr;
   }
 
   .meter-row b {
