@@ -16,7 +16,7 @@ export type PassMeter = {
 type PracticePanelProps = {
   surfaceWords: SurfaceWordView[]
   showWordSeparator: boolean
-  warning: string | null
+  warningMessages: string[]
   typingBox: Ref<HTMLTextAreaElement | null>
   currentKana: string
   compositionText: string
@@ -133,7 +133,9 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
         {props.surfaceWords.length === 0 && <span class="target-empty">No eligible real words yet</span>}
       </div>
 
-      {props.warning && <p class="warning">{props.warning}</p>}
+      {props.warningMessages.map((message) => (
+        <p key={message} class="warning">{message}</p>
+      ))}
       {props.lastEvaluation && (
         <div class="result-strip">
           <span>Speed <strong>{Math.round(props.lastEvaluation.kpm)}</strong> kana/min</span>
@@ -149,7 +151,7 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
   props: [
     'surfaceWords',
     'showWordSeparator',
-    'warning',
+    'warningMessages',
     'typingBox',
     'currentKana',
     'compositionText',

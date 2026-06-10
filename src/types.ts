@@ -81,9 +81,26 @@ export type PracticeWord = WordEntry & {
   repetitionId: string
 }
 
+export type KanaPracticeScript = 'hiragana' | 'katakana'
+
+export type BatchWarning =
+  | {
+    type: 'noEligibleWords'
+    script: KanaPracticeScript
+    targetKana: string
+  }
+  | {
+    type: 'duplicatedToFill'
+    script: KanaPracticeScript
+    targetKana: string
+    available: number
+    needed: number
+    duplicated: number
+  }
+
 export type BatchResult = {
   words: PracticeWord[]
-  warning: string | null
+  warnings: BatchWarning[]
 }
 
 export type PerKanaEvaluation = {

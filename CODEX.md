@@ -23,7 +23,8 @@ normal practice duplicates eligible real words until the word list is expanded.
 
 Hiragana and katakana characters are separate units, so あ and ア have separate stats.
 Mixed mode practices both scripts and updates the same shared per-kana stats depending on which characters appear in the batch.
-In mixed mode, each practice word is chosen from either the current hiragana target pool or current katakana target pool at random.
+In mixed mode, split the requested batch size into hiragana and katakana quotas, choosing each quota slot randomly.
+Generate each script quota independently from that script's current target kana pool.
 
 ## Batch Generation
 
@@ -34,6 +35,12 @@ A generated practice word must satisfy both rules:
 Default batch size should be coverable with unique real words for the common early progression path.
 
 If the user sets a batch size larger than the available unique eligible words, duplicate eligible words and shuffle the batch.
+
+Batch generation should draw unique eligible words first. Only duplicate words when the relevant eligible pool
+is smaller than the requested script quota. Repeated words must receive unique repetition ids.
+
+Low-level batch generation should return structured warnings, not user-facing English strings. Format those
+warnings in the session/UI layer. Warnings should report shortages per script and target kana.
 
 ## Practice Flow
 
@@ -47,10 +54,12 @@ choose current target kana
 
 ## Passing Metrics
 
-A kana passes when its smoothed recent stats meet all configured goals:
+A kana passes when its smoothed recent stats meet all goals:
 - smoothed kpm >= speed goal
 - smoothed accuracy >= accuracy goal
 - appearances >= required appearance count
+
+The required appearance count is a product constant, not a user-editable setting.
 
 Smoothing uses the latest per-kana attempt records until they cover at least 20 appearances.
 If fewer records exist, use all available data.
@@ -68,7 +77,7 @@ Track:
 - time spent overall
 - daily practice time goal
 
-Goals should be editable.
+Speed, accuracy, smoothing window, and daily practice time goals should be editable.
 
 ## UI Direction
 
@@ -89,7 +98,9 @@ export const ComponentName = defineComponent<Props>((props) => {
 
 Pinia is allowed if it makes settings, progress, sessions, or time tracking cleaner.
 
-Trainer logic should stay pure and testable even if state moves to Pinia.
+Model logic should stay pure and testable even if state moves to Pinia.
+Keep batch generation, progress transitions, evaluation, settings normalization, storage, and UI/session
+orchestration in focused modules with explicit actions.
 
 ## Persistence
 
