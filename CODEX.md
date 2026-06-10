@@ -23,6 +23,7 @@ normal practice duplicates eligible real words until the word list is expanded.
 
 Hiragana and katakana characters are separate units, so あ and ア have separate stats.
 Mixed mode practices both scripts and updates the same shared per-kana stats depending on which characters appear in the batch.
+In mixed mode, each practice word is chosen from either the current hiragana target pool or current katakana target pool at random.
 
 ## Batch Generation
 
@@ -108,15 +109,21 @@ Use a hidden real input for IME capture. Render target words as the visible typi
 
 - words are separated by an optional centered dot separator
 - separator is visual only, not required to input
+- separator visibility is controlled by a boolean setting
 - completed kana have muted color
 - future kana stay readable
 - current kana has a caret underline
 - wrong input marks the required current kana red until it's written correctly
+- wrong committed kana allocate elapsed time to the required kana before being discarded
 
 During IME composition:
 
-- show composition text above the current kana as a small bubble (rectangle-ish)
+- show composition text above the current kana as a small bubble
 - treat composition as preview-only until committed
+- keep the hidden textarea anchored at the current kana before composition starts, so the system language change popup
+  shows at expected location
+- move the hidden textarea off-screen while composition is active in order to prevent the system from showing kanji suggestions
+- if composition text completes the remainder of the current word, commit that word immediately so the next word starts with fresh composition
 
 When a word is completed, record word timing. When the batch is completed, auto-submit the attempt.
 

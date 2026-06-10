@@ -64,10 +64,6 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
             <input value={props.accuracyPercent} type="number" min="50" max="100" onChange={(event) => updateSettings(ctx, { targetAccuracy: readNumber(event) / 100 })} />
           </label>
           <label>
-            Required appearances
-            <input value={props.settings.requiredAppearanceCount} type="number" min="1" max="500" onChange={(event) => updateSettings(ctx, { requiredAppearanceCount: readNumber(event) })} />
-          </label>
-          <label>
             Daily practice goal minutes
             <input value={props.settings.dailyPracticeMinutesGoal} type="number" min="1" max="240" onChange={(event) => updateSettings(ctx, { dailyPracticeMinutesGoal: readNumber(event) })} />
           </label>

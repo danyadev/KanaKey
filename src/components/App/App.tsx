@@ -1,4 +1,4 @@
-import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { Hero } from '../Hero/Hero'
 import { HistoryPanel } from '../HistoryPanel/HistoryPanel'
@@ -22,7 +22,7 @@ import {
 } from '../../inputSurface'
 import seedWords from '../../words.json'
 import { clearProgress, loadProgress, loadSettings, saveProgress, saveSettings } from '../../storage'
-import type { BatchEvaluation, BatchResult, PracticeMode, PracticeSettings, ProgressState, WordEntry } from '../../types'
+import type { BatchEvaluation, BatchResult, PracticeSettings, ProgressState, WordEntry } from '../../types'
 import {
   applyEvaluationToProgress,
   createInitialProgress,
@@ -67,17 +67,14 @@ export const App = defineComponent((_props, _ctx) => {
   const recentSessions = computed(() => progress.value.sessionHistory.slice(-5).reverse())
   const passMeter = computed(() => {
     const stats = currentStats.value
-    const appearances = stats?.appearances ?? 0
     const kpm = Math.round(stats?.smoothedKpm ?? 0)
     const accuracy = Math.round((stats?.smoothedAccuracy ?? 0) * 100)
 
     return {
       kpm,
       accuracy,
-      appearances,
       kpmPercent: meterPercent(kpm, settings.value.targetKpm),
       accuracyPercent: meterPercent(accuracy, accuracyPercent.value),
-      appearancesPercent: meterPercent(appearances, settings.value.requiredAppearanceCount),
     }
   })
   const kanaPills = computed<KanaPill[]>(() => [
@@ -89,7 +86,7 @@ export const App = defineComponent((_props, _ctx) => {
     const goalMs = settings.value.dailyPracticeMinutesGoal * 60_000
     const todayMs = progress.value.practiceTime.todayMs
     return {
-      label: `${formatMinutes(todayMs)} / ${settings.value.dailyPracticeMinutesGoal} min today`,
+      label: `${formatMinutes(todayMs)} / ${settings.value.dailyPracticeMinutesGoal} min`,
       percent: meterPercent(todayMs, goalMs),
     }
   })
@@ -122,6 +119,15 @@ export const App = defineComponent((_props, _ctx) => {
 
   onMounted(() => {
     focusTypingBox()
+    document.addEventListener('visibilitychange', focusTypingBoxWhenVisible)
+    window.addEventListener('focus', focusTypingBox)
+    window.addEventListener('pageshow', focusTypingBox)
+  })
+
+  onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', focusTypingBoxWhenVisible)
+    window.removeEventListener('focus', focusTypingBox)
+    window.removeEventListener('pageshow', focusTypingBox)
   })
 
   function submitBatch(completedAt = Date.now()) {
@@ -132,12 +138,10 @@ export const App = defineComponent((_props, _ctx) => {
     const normalizedSettings = normalizeSettings(settings.value)
     progress.value = applyEvaluationToProgress(progress.value, normalizedSettings, evaluation, batch.value.words, completedAt)
     const nextTarget = progress.value.currentTargetKanaByMode[mode]
-    const targetStats = progress.value.kanaStats[previousTarget]
     outcomeMessage.value = buildOutcomeMessage({
       evaluation,
       previousTarget,
       nextTarget,
-      targetAppearances: targetStats?.appearances ?? 0,
       settings: normalizedSettings,
     })
     lastEvaluation.value = evaluation
@@ -173,6 +177,7 @@ export const App = defineComponent((_props, _ctx) => {
     const nextState = commitKanaInput(inputState.value, value, now)
     inputState.value = nextState
     if (nextState.completed) submitBatch(now)
+    else focusTypingBox()
   }
 
   function handleCompositionEnd(value: string) {
@@ -194,12 +199,16 @@ export const App = defineComponent((_props, _ctx) => {
     nextTick(() => typingBox.value?.focus())
   }
 
+  function focusTypingBoxWhenVisible() {
+    if (!document.hidden) focusTypingBox()
+  }
+
   function buildKanaPills(script: 'hiragana' | 'katakana'): KanaPill[] {
     const order = getKanaOrder(script)
-    const progressMode = settingsModeForKanaMap(script)
+    const progressMode = script
     const unlockedKana = new Set(getKanaOrder(progressMode).slice(0, progress.value.unlockedCountByMode[progressMode]))
     const current = progress.value.currentTargetKanaByMode[progressMode]
-    const showCurrent = settings.value.mode === progressMode
+    const showCurrent = settings.value.mode === progressMode || settings.value.mode === 'mixed'
 
     return order.map((kana) => {
       const locked = !unlockedKana.has(kana)
@@ -212,10 +221,6 @@ export const App = defineComponent((_props, _ctx) => {
 
       return { kana, status, script }
     })
-  }
-
-  function settingsModeForKanaMap(script: 'hiragana' | 'katakana'): PracticeMode {
-    return settings.value.mode === 'mixed' ? 'mixed' : script
   }
 
   return () => (
@@ -238,7 +243,6 @@ export const App = defineComponent((_props, _ctx) => {
           isComposing={inputState.value.isComposing}
           targetKpm={settings.value.targetKpm}
           targetAccuracyPercent={accuracyPercent.value}
-          requiredAppearanceCount={settings.value.requiredAppearanceCount}
           passMeter={passMeter.value}
           lastEvaluation={lastEvaluation.value}
           outcomeMessage={outcomeMessage.value}
@@ -285,7 +289,6 @@ function serializeSettings(settings: PracticeSettings): string {
 function targetSettingsChanged(previous: PracticeSettings, next: PracticeSettings): boolean {
   return previous.targetKpm !== next.targetKpm
     || previous.targetAccuracy !== next.targetAccuracy
-    || previous.requiredAppearanceCount !== next.requiredAppearanceCount
     || previous.smoothingAppearanceCount !== next.smoothingAppearanceCount
 }
 
@@ -297,12 +300,11 @@ type BuildOutcomeMessageInput = {
   evaluation: BatchEvaluation
   previousTarget: string
   nextTarget: string
-  targetAppearances: number
   settings: PracticeSettings
 }
 
 function buildOutcomeMessage(input: BuildOutcomeMessageInput): string {
-  const { evaluation, previousTarget, nextTarget, targetAppearances, settings } = input
+  const { evaluation, previousTarget, nextTarget, settings } = input
   if (previousTarget !== nextTarget) {
     return `${previousTarget} passed. Next target: ${nextTarget}.`
   }
@@ -313,11 +315,6 @@ function buildOutcomeMessage(input: BuildOutcomeMessageInput): string {
   }
   if (evaluation.accuracy < settings.targetAccuracy) {
     missing.push(`Accuracy needs +${Math.ceil((settings.targetAccuracy - evaluation.accuracy) * 100)}%.`)
-  }
-
-  const appearancesMissing = Math.max(0, settings.requiredAppearanceCount - targetAppearances)
-  if (appearancesMissing > 0) {
-    missing.push(`${previousTarget} needs ${appearancesMissing} more appearances.`)
   }
 
   if (missing.length > 0) return `Keep going. ${missing.join(' ')}`

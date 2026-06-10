@@ -15,6 +15,7 @@ import {
   generateBatch,
   getSmoothingAttempts,
   INITIAL_UNLOCKED_COUNT,
+  REQUIRED_APPEARANCE_COUNT,
   isWordUnlocked,
   normalizePracticeTime,
   normalizeSettings,
@@ -28,7 +29,6 @@ const settings: PracticeSettings = {
   batchSize: 3,
   targetKpm: 60,
   targetAccuracy: 0.9,
-  requiredAppearanceCount: 4,
   smoothingAppearanceCount: 4,
 }
 
@@ -42,6 +42,11 @@ const words: WordEntry[] = [
 
 function fixedRandom() {
   return 0
+}
+
+function sequenceRandom(values: number[]) {
+  let index = 0
+  return () => values[index++ % values.length]
 }
 
 describe('trainer logic', () => {
@@ -62,7 +67,6 @@ describe('trainer logic', () => {
     expect(normalized.batchSize).toBe(1)
     expect(normalized.targetAccuracy).toBe(1)
     expect(normalized.smoothingAppearanceCount).toBe(DEFAULT_SETTINGS.smoothingAppearanceCount)
-    expect(normalized.requiredAppearanceCount).toBe(DEFAULT_SETTINGS.requiredAppearanceCount)
     expect(normalized.mode).toBe('hiragana')
     expect(normalized.showWordSeparator).toBe(false)
   })
@@ -120,6 +124,17 @@ describe('trainer logic', () => {
     expect(batch.words.every((word) => isWordUnlocked(word, new Set(['ス', 'キ', 'ー', 'バ', 'パ'])))).toBe(true)
   })
 
+  it('chooses mixed mode words from hiragana or katakana pools randomly', () => {
+    const mixedSettings = { ...settings, mode: 'mixed' as const, batchSize: 4 }
+    const progress = createInitialProgress(mixedSettings)
+    const batch = generateBatch(seedWords as WordEntry[], mixedSettings, progress, sequenceRandom([0, 0, 0.9, 0, 0, 0, 0.9, 0]))
+    const scripts = new Set(batch.words.map((word) => word.kanaScript))
+
+    expect(scripts).toEqual(new Set(['hiragana', 'katakana']))
+    expect(batch.words.filter((word) => word.kanaScript === 'hiragana').every((word) => word.kana.includes('あ'))).toBe(true)
+    expect(batch.words.filter((word) => word.kanaScript === 'katakana').every((word) => word.kana.includes('ス'))).toBe(true)
+  })
+
   it('evaluates kana per minute, appearance counts, and allocated time', () => {
     const evaluation = evaluateBatch('あい　あお', 'あい あえ', 60_000)
 
@@ -172,14 +187,14 @@ describe('trainer logic', () => {
 
   it('passes only after speed, accuracy, and required appearances are met', () => {
     const stats = createEmptyKanaStats('あ')
-    stats.appearances = 3
-    stats.correct = 3
-    stats.history = [attempt(1, 3, 3, 1_000)]
+    stats.appearances = REQUIRED_APPEARANCE_COUNT - 1
+    stats.correct = REQUIRED_APPEARANCE_COUNT - 1
+    stats.history = [attempt(1, REQUIRED_APPEARANCE_COUNT - 1, REQUIRED_APPEARANCE_COUNT - 1, 1_000)]
     refreshSmoothedStats(stats, settings)
     expect(stats.passed).toBe(false)
 
-    stats.appearances = 4
-    stats.correct = 4
+    stats.appearances = REQUIRED_APPEARANCE_COUNT
+    stats.correct = REQUIRED_APPEARANCE_COUNT
     stats.history.push(attempt(2, 1, 1, 1_000))
     refreshSmoothedStats(stats, settings)
     expect(stats.passed).toBe(true)
@@ -215,11 +230,11 @@ describe('trainer logic', () => {
       wordTimings: [],
     })
 
-    const next = refreshProgressPassFlags(reactive(progress), { ...settings, targetKpm: 500 })
+    const next = refreshProgressPassFlags(reactive(progress), { ...settings, targetKpm: 2_000 })
 
     expect(progress.kanaStats['あ'].passed).toBe(true)
     expect(next.kanaStats['あ'].passed).toBe(false)
-    expect(next.kanaStats['あ'].appearances).toBe(settings.requiredAppearanceCount)
+    expect(next.kanaStats['あ'].appearances).toBe(REQUIRED_APPEARANCE_COUNT)
     expect(next.kanaStats['あ'].history).toHaveLength(1)
     expect(next.sessionHistory).toEqual(progress.sessionHistory)
   })
@@ -258,10 +273,10 @@ function attempt(attemptNumber: number, appearanceCount: number, correctCount: n
 
 function markPassed(stats: KanaStats, practiceSettings: PracticeSettings) {
   stats.attempts = 1
-  stats.appearances = practiceSettings.requiredAppearanceCount
-  stats.correct = practiceSettings.requiredAppearanceCount
+  stats.appearances = REQUIRED_APPEARANCE_COUNT
+  stats.correct = REQUIRED_APPEARANCE_COUNT
   stats.incorrect = 0
-  stats.history = [attempt(1, practiceSettings.requiredAppearanceCount, practiceSettings.requiredAppearanceCount, 1_000)]
+  stats.history = [attempt(1, REQUIRED_APPEARANCE_COUNT, REQUIRED_APPEARANCE_COUNT, 1_000)]
   refreshSmoothedStats(stats, practiceSettings)
 }
 

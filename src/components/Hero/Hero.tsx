@@ -9,17 +9,16 @@ type HeroProps = {
   dailyProgressPercent: number
 }
 
-export const Hero = defineComponent<HeroProps>((props, _ctx) => {
+export const Hero = defineComponent<HeroProps>((props) => {
   return () => (
     <section class="hero panel">
       <div>
-        <p class="eyebrow">KanaKey MVP</p>
-        <h1>Focused kana typing.</h1>
-        <p class="lede">
-          Train one kana at a time through short Japanese words. The next kana unlocks only after the current set stays stable.
-        </p>
+        <p class="eyebrow">KanaKey</p>
+        <h1>Focused kana typing</h1>
+        <p class="lede">Train one kana at a time through short Japanese words</p>
       </div>
       <div class="goal-card" aria-label="Current goals progress">
+        <p class="eyebrow">Goal progress</p>
         <GoalLine label="Speed" percent={props.speedProgressPercent} />
         <GoalLine label="Accuracy" percent={props.accuracyProgressPercent} />
         <GoalLine label="Today" percent={props.dailyProgressPercent} value={props.dailyProgressLabel} />

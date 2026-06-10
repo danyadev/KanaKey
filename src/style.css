@@ -59,6 +59,10 @@ button:disabled {
   opacity: 0.48;
 }
 
+b, strong {
+  font-weight: 600;
+}
+
 .ghost,
 .primary {
   border-radius: 999px;

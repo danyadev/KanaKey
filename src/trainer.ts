@@ -16,13 +16,13 @@ import type {
 
 export const STORAGE_VERSION = 2
 export const INITIAL_UNLOCKED_COUNT = 5
+export const REQUIRED_APPEARANCE_COUNT = 20
 
 export const DEFAULT_SETTINGS: PracticeSettings = {
   mode: 'hiragana',
-  batchSize: 3,
-  targetKpm: 80,
+  batchSize: 10,
+  targetKpm: 60,
   targetAccuracy: 0.95,
-  requiredAppearanceCount: 20,
   smoothingAppearanceCount: 20,
   dailyPracticeMinutesGoal: 10,
   showWordSeparator: true,
@@ -53,7 +53,6 @@ export function normalizeSettings(input: Partial<PracticeSettings> = {}): Practi
     batchSize: clampInteger(input.batchSize ?? DEFAULT_SETTINGS.batchSize, 1, 50),
     targetKpm: clampInteger(input.targetKpm ?? DEFAULT_SETTINGS.targetKpm, 1, 400),
     targetAccuracy: clampNumber(input.targetAccuracy ?? DEFAULT_SETTINGS.targetAccuracy, 0.5, 1),
-    requiredAppearanceCount: clampInteger(input.requiredAppearanceCount ?? DEFAULT_SETTINGS.requiredAppearanceCount, 1, 500),
     smoothingAppearanceCount: clampInteger(input.smoothingAppearanceCount ?? DEFAULT_SETTINGS.smoothingAppearanceCount, 1, 500),
     dailyPracticeMinutesGoal: clampInteger(input.dailyPracticeMinutesGoal ?? DEFAULT_SETTINGS.dailyPracticeMinutesGoal, 1, 240),
     showWordSeparator: typeof input.showWordSeparator === 'boolean'
@@ -71,8 +70,7 @@ export function createInitialProgress(settings: PracticeSettings = DEFAULT_SETTI
 
   for (const mode of modes) {
     const order = getKanaOrder(mode)
-    const unlockedCount = Math.min(INITIAL_UNLOCKED_COUNT, order.length)
-    unlockedCountByMode[mode] = unlockedCount
+    unlockedCountByMode[mode] = Math.min(INITIAL_UNLOCKED_COUNT, order.length)
     currentTargetKanaByMode[mode] = order[0]
     for (const kana of order) kanaStats[kana] ??= createEmptyKanaStats(kana)
   }
@@ -149,13 +147,11 @@ export function generateBatch(
 ): BatchResult {
   const normalized = normalizeSettings(settings)
   const mode = normalized.mode
+  if (mode === 'mixed') return generateMixedBatch(words, normalized, progress, random)
+
   const unlockedKana = new Set(getUnlockedKana(progress, mode))
   const targetKana = progress.currentTargetKanaByMode[mode]
-  const eligibleWords = words
-    .filter((word) => !word.synthetic)
-    .filter((word) => matchesMode(word, mode))
-    .filter((word) => isWordUnlocked(word, unlockedKana))
-    .filter((word) => containsTargetKana(word, targetKana))
+  const eligibleWords = getEligibleTargetWords(words, mode, unlockedKana, targetKana)
 
   if (eligibleWords.length === 0) {
     return {
@@ -270,7 +266,12 @@ export function applyEvaluationToProgress(
   }
   next.sessionHistory = [...next.sessionHistory, sessionResult].slice(-100)
   next.practiceTime = addPracticeTime(next.practiceTime, evaluation.elapsedMs, now)
-  next.currentTargetKanaByMode[mode] = chooseNextTargetKana(next, settings)
+  if (mode === 'mixed') {
+    next.currentTargetKanaByMode.hiragana = chooseNextTargetKana(next, { ...settings, mode: 'hiragana' })
+    next.currentTargetKanaByMode.katakana = chooseNextTargetKana(next, { ...settings, mode: 'katakana' })
+  } else {
+    next.currentTargetKanaByMode[mode] = chooseNextTargetKana(next, settings)
+  }
 
   return next
 }
@@ -333,7 +334,7 @@ export function refreshProgressPassFlags(progress: ProgressState, settings: Prac
 }
 
 export function isKanaPassed(stats: KanaStats, settings: PracticeSettings): boolean {
-  return stats.appearances >= settings.requiredAppearanceCount
+  return stats.appearances >= REQUIRED_APPEARANCE_COUNT
     && stats.smoothedKpm >= settings.targetKpm
     && stats.smoothedAccuracy >= settings.targetAccuracy
 }
@@ -341,7 +342,9 @@ export function isKanaPassed(stats: KanaStats, settings: PracticeSettings): bool
 export function progressSummary(progress: ProgressState, settings: PracticeSettings) {
   const mode = settings.mode
   const unlocked = getUnlockedKana(progress, mode)
-  const current = progress.currentTargetKanaByMode[mode]
+  const current = mode === 'mixed'
+    ? `${progress.currentTargetKanaByMode.hiragana} / ${progress.currentTargetKanaByMode.katakana}`
+    : progress.currentTargetKanaByMode[mode]
   const weak = unlocked.filter((kana) => {
     const kanaStats = progress.kanaStats[kana]
     return kanaStats.appearances > 0 && !kanaStats.passed
@@ -377,6 +380,72 @@ export function addPracticeTime(practiceTime: PracticeTimeState, elapsedMs: numb
     todayMs: normalized.todayMs + safeElapsedMs,
     totalMs: normalized.totalMs + safeElapsedMs,
   }
+}
+
+function generateMixedBatch(
+  words: WordEntry[],
+  settings: PracticeSettings,
+  progress: ProgressState,
+  random: () => number,
+): BatchResult {
+  const pools = [
+    {
+      script: 'hiragana' as const,
+      targetKana: progress.currentTargetKanaByMode.hiragana,
+      words: getEligibleTargetWords(
+        words,
+        'hiragana',
+        new Set(getUnlockedKana(progress, 'hiragana')),
+        progress.currentTargetKanaByMode.hiragana,
+      ),
+    },
+    {
+      script: 'katakana' as const,
+      targetKana: progress.currentTargetKanaByMode.katakana,
+      words: getEligibleTargetWords(
+        words,
+        'katakana',
+        new Set(getUnlockedKana(progress, 'katakana')),
+        progress.currentTargetKanaByMode.katakana,
+      ),
+    },
+  ]
+  const availablePools = pools.filter((pool) => pool.words.length > 0)
+
+  if (availablePools.length === 0) {
+    return {
+      words: [],
+      warning: 'No eligible real words for the current hiragana or katakana targets yet.',
+    }
+  }
+
+  const batch: WordEntry[] = []
+  for (let index = 0; index < settings.batchSize; index += 1) {
+    const preferredPool = pools[Math.floor(random() * pools.length)]
+    const pool = preferredPool.words.length > 0
+      ? preferredPool
+      : availablePools[Math.floor(random() * availablePools.length)]
+    batch.push(pool.words[Math.floor(random() * pool.words.length)])
+  }
+
+  const duplicated = batch.length > new Set(batch.map((word) => word.id)).size
+  return {
+    words: batch.map((word, index) => ({ ...word, repetitionId: `${word.id}-${index}` })),
+    warning: duplicated ? 'Duplicated eligible real words to fill this mixed batch.' : null,
+  }
+}
+
+function getEligibleTargetWords(
+  words: WordEntry[],
+  mode: Exclude<PracticeMode, 'mixed'>,
+  unlockedKana: Set<string>,
+  targetKana: string,
+): WordEntry[] {
+  return words
+    .filter((word) => !word.synthetic)
+    .filter((word) => matchesMode(word, mode))
+    .filter((word) => isWordUnlocked(word, unlockedKana))
+    .filter((word) => containsTargetKana(word, targetKana))
 }
 
 function takeShuffled<T>(items: T[], count: number, random: () => number): T[] {

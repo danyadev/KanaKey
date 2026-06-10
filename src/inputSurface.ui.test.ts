@@ -6,6 +6,7 @@ import {
   buildInputEvaluation,
   commitKanaInput,
   createInputSurfaceState,
+  getCurrentWordRemainder,
   getSurfaceWordViews,
   shouldHandlePracticeShortcut,
   startComposition,
@@ -13,6 +14,9 @@ import {
 } from './inputSurface'
 import { PracticePanel } from './components/PracticePanel/PracticePanel'
 import { SettingsPanel } from './components/SettingsPanel/SettingsPanel'
+import { Hero } from './components/Hero/Hero'
+import { KanaMap } from './components/KanaMap/KanaMap'
+import type { KanaRow } from './components/KanaMap/kanaRows'
 import { DEFAULT_SETTINGS } from './trainer'
 
 const words = [
@@ -101,6 +105,13 @@ describe('keybr-style input surface behavior', () => {
     expect(getSurfaceWordViews(state)[1].units[0]).toMatchObject({ kana: 'あ', status: 'current' })
   })
 
+  it('detects when composition text completes the rest of the current word', () => {
+    let state = createInputSurfaceState(words, 0)
+    state = commitKanaInput(state, 'あ', 100)
+
+    expect(getCurrentWordRemainder(getSurfaceWordViews(state))).toBe('い')
+  })
+
   it('marks batch completion so the app can auto-submit immediately', () => {
     let state = createInputSurfaceState([{ kana: 'あい' }], 0)
     let submitCount = 0
@@ -119,6 +130,7 @@ describe('practice surface rendering', () => {
 
     expect(html).toContain('class="hidden-ime-input"')
     expect(html).toContain('autocomplete="off"')
+    expect(html).toContain('autocapitalize="off"')
     expect(html).toContain('autocorrect="off"')
     expect(html).toContain('spellcheck="false"')
   })
@@ -130,6 +142,7 @@ describe('practice surface rendering', () => {
     const html = await renderPracticePanel(state)
 
     expect(html).toContain('class="composition-bubble"')
+    expect(html).toContain('hidden-ime-input composing')
     expect(html).toContain('>a</span>')
   })
 
@@ -168,6 +181,33 @@ describe('settings rendering', () => {
   })
 })
 
+describe('supporting UI rendering', () => {
+  it('labels the top goal widget', async () => {
+    const app = createSSRApp(Hero, {
+      speedProgressPercent: 20,
+      accuracyProgressPercent: 30,
+      dailyProgressLabel: '1 / 10 min',
+      dailyProgressPercent: 10,
+    })
+    const html = await renderToString(app)
+
+    expect(html).toContain('Goal progress')
+    expect(html).toContain('aria-label="Current goals progress"')
+  })
+
+  it('uses a divider instead of the old kana-map legend', async () => {
+    const rows: KanaRow[] = [
+      { id: 'hiragana-a', label: 'あ', script: 'hiragana', items: [{ kana: 'あ', status: 'current', script: 'hiragana' }] },
+      { id: 'katakana-a', label: 'ア', script: 'katakana', items: [{ kana: 'ア', status: 'locked', script: 'katakana' }] },
+    ]
+    const app = createSSRApp(KanaMap, { rows })
+    const html = await renderToString(app)
+
+    expect(html).toContain('kana-script-divider')
+    expect(html).not.toContain('hiragana + katakana')
+  })
+})
+
 function commitAndAutoSubmit(state: ReturnType<typeof createInputSurfaceState>, value: string, now: number, submit: () => void) {
   const next = commitKanaInput(state, value, now)
   if (next.completed) submit()
@@ -185,8 +225,7 @@ async function renderPracticePanel(state: ReturnType<typeof createInputSurfaceSt
     isComposing: state.isComposing,
     targetKpm: 80,
     targetAccuracyPercent: 95,
-    requiredAppearanceCount: 20,
-    passMeter: { kpm: 0, accuracy: 0, appearances: 0, kpmPercent: 0, accuracyPercent: 0, appearancesPercent: 0 },
+    passMeter: { kpm: 0, accuracy: 0, kpmPercent: 0, accuracyPercent: 0 },
     lastEvaluation: null,
     outcomeMessage: null,
   })

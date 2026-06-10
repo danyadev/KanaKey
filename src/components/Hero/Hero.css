@@ -27,11 +27,12 @@
 
 .goal-card {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-height: 76px;
   padding: 11px 12px;
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(200, 75, 49, 0.14), rgba(47, 114, 133, 0.14));
+  transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .goal-line {
@@ -63,6 +64,7 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--vermilion), var(--sea));
+  transition: width 240ms ease;
 }
 
 @media (max-width: 760px) {

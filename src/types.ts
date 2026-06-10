@@ -20,7 +20,6 @@ export type PracticeSettings = {
   batchSize: number
   targetKpm: number
   targetAccuracy: number
-  requiredAppearanceCount: number
   smoothingAppearanceCount: number
   dailyPracticeMinutesGoal: number
   showWordSeparator: boolean

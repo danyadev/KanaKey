@@ -10,13 +10,6 @@
   justify-content: space-between;
 }
 
-.practice-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.4;
-}
-
 .pass-card {
   display: grid;
   gap: 8px;
@@ -24,6 +17,7 @@
   padding: 11px 12px;
   border-radius: 14px;
   background: rgba(234, 216, 187, 0.42);
+  transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .pass-card-head {
@@ -61,8 +55,7 @@
 
 .surface-word {
   display: inline-flex;
-  align-items: baseline;
-  gap: 1px;
+  align-items: center;
   color: var(--ink);
   font-size: clamp(1.65rem, 2.7vw, 2.65rem);
   font-weight: 400;
@@ -74,7 +67,7 @@
   position: relative;
   display: inline-block;
   min-width: 0.72em;
-  padding: 0 1px 5px;
+  padding: 0 1px;
 }
 
 .surface-kana.completed {
@@ -90,14 +83,14 @@
 }
 
 .surface-kana.current::after {
-  position: absolute;
-  right: -2px;
-  bottom: 1px;
-  left: -2px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--sea);
   content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--sea);
 }
 
 .surface-kana.wrong {
@@ -128,12 +121,10 @@
 }
 
 .visual-separator {
-  margin-left: 11px;
   color: rgba(76, 69, 58, 0.32);
-  font-family: "Avenir Next", "Gill Sans", "Helvetica Neue", sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1;
+  margin-left: 0.75rem;
+  font-family: sans-serif;
+  font-size: 1.5rem;
   user-select: none;
 }
 
@@ -144,14 +135,22 @@
 
 .hidden-ime-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
   overflow: hidden;
   margin: 0;
   padding: 0;
   border: 0;
-  opacity: 0.01;
+  opacity: 0;
   resize: none;
+}
+
+.hidden-ime-input.composing {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
 }
 
 .warning,
@@ -195,6 +194,7 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--sea), var(--moss));
+  transition: width 240ms ease;
 }
 
 .meter-row b {

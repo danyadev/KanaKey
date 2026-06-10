@@ -172,6 +172,17 @@ export function getSurfaceWordViews(state: InputSurfaceState): SurfaceWordView[]
   return [...words.values()]
 }
 
+export function getCurrentWordRemainder(words: SurfaceWordView[]): string {
+  for (const word of words) {
+    const currentIndex = word.units.findIndex((unit) => unit.status === 'current')
+    if (currentIndex >= 0) {
+      return word.units.slice(currentIndex).map((unit) => unit.kana).join('')
+    }
+  }
+
+  return ''
+}
+
 export function shouldHandlePracticeShortcut(event: Pick<KeyboardEvent, 'isComposing' | 'key' | 'metaKey' | 'ctrlKey'>, composing: boolean): boolean {
   if (composing || event.isComposing) return false
   if (event.key === 'Escape') return true

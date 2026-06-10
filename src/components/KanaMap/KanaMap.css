@@ -3,13 +3,6 @@
   padding: 14px;
 }
 
-.legend {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
 .kana-rows {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(278px, 1fr));
@@ -25,8 +18,12 @@
   min-width: 0;
 }
 
-.kana-row.katakana {
-  margin-top: 8px;
+.kana-script-divider {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 1px;
+  margin: 8px 0;
+  background: linear-gradient(90deg, transparent, rgba(60, 45, 26, 0.22), transparent);
 }
 
 .row-label {
