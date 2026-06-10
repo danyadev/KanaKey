@@ -6,18 +6,58 @@ import {
   maxInitialUnlockCount,
   normalizeSettings,
 } from './settings'
-import type {
-  BatchEvaluation,
-  KanaAttempt,
-  KanaStats,
-  PracticeMode,
-  PracticeSettings,
-  PracticeTimeState,
-  PracticeWord,
-  ProgressState,
-  SessionResult,
-  WordTiming,
-} from './types'
+import type { BatchEvaluation, WordTiming } from './evaluation'
+import type { PracticeMode } from './modes'
+import type { PracticeSettings } from './settings'
+import type { PracticeWord } from './words'
+
+export type KanaAttempt = {
+  timestamp: number
+  attemptNumber: number
+  appearanceCount: number
+  correctCount: number
+  allocatedMs: number
+}
+
+export type KanaStats = {
+  kana: string
+  attempts: number
+  appearances: number
+  correct: number
+  incorrect: number
+  history: KanaAttempt[]
+  smoothedKpm: number
+  smoothedAccuracy: number
+  passed: boolean
+  lastSeenAt: number | null
+}
+
+export type SessionResult = {
+  timestamp: number
+  mode: PracticeMode
+  targetKana: string
+  words: string[]
+  elapsedMs: number
+  kpm: number
+  accuracy: number
+  wordTimings: WordTiming[]
+}
+
+export type PracticeTimeState = {
+  todayDate: string
+  todayMs: number
+  totalMs: number
+}
+
+export type ProgressState = {
+  mode: PracticeMode
+  unlockedCountByMode: Record<PracticeMode, number>
+  currentTargetKanaByMode: Record<PracticeMode, string>
+  kanaStats: Record<string, KanaStats>
+  sessionHistory: SessionResult[]
+  practiceTime: PracticeTimeState
+  nextAttemptNumber: number
+}
 
 type TargetAdvance = {
   targetKana: string

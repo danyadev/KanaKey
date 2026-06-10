@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
 
@@ -11,12 +12,14 @@ import {
   shouldHandlePracticeShortcut,
   startComposition,
   updateComposition,
-} from './inputSurface'
-import { DEFAULT_SETTINGS, formatBatchWarning } from './trainer'
+} from './model/inputSurface'
+import { DEFAULT_SETTINGS } from './model/settings'
+import { formatBatchWarning } from './session/practiceMessages'
 import { App } from './components/App/App'
 import { PracticePanel } from './components/PracticePanel/PracticePanel'
 import { SettingsPanel } from './components/SettingsPanel/SettingsPanel'
-import type { BatchEvaluation, PracticeSettings } from './types'
+import type { BatchEvaluation } from './model/evaluation'
+import type { PracticeSettings } from './model/settings'
 
 const words = [
   { kana: 'あい' },
@@ -154,6 +157,50 @@ describe('PracticePanel component behavior', () => {
     expect(withoutSeparator.find('.visual-separator').exists()).toBe(false)
   })
 
+  it('input events emit committed text', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+
+    await writeKana(wrapper, 'あ')
+
+    expect(wrapper.emitted('commitInput')).toEqual([['あ']])
+  })
+
+  it('Escape emits clear', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+
+    await wrapper.find('textarea.hidden-ime-input').trigger('keydown', { key: 'Escape' })
+
+    expect(wrapper.emitted('clear')).toHaveLength(1)
+  })
+
+  it('Cmd or Ctrl Enter emits submit', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+    const input = wrapper.find('textarea.hidden-ime-input')
+
+    await input.trigger('keydown', { key: 'Enter', metaKey: true })
+    await input.trigger('keydown', { key: 'Enter', ctrlKey: true })
+
+    expect(wrapper.emitted('submit')).toHaveLength(2)
+  })
+
+  it('composition update emits compositionUpdate', async () => {
+    const wrapper = mountPracticePanel(createInputSurfaceState(words, 0))
+
+    await wrapper.find('textarea.hidden-ime-input').trigger('compositionupdate', { data: 'a' })
+
+    expect(wrapper.emitted('compositionUpdate')).toEqual([['a']])
+  })
+
+  it('composition matching the current word remainder emits compositionEnd', async () => {
+    let state = createInputSurfaceState(words, 0)
+    state = commitKanaInput(state, 'あ', 100)
+    const wrapper = mountPracticePanel(state)
+
+    await wrapper.find('textarea.hidden-ime-input').trigger('compositionupdate', { data: 'い' })
+
+    expect(wrapper.emitted('compositionEnd')).toEqual([['い']])
+  })
+
   it('typing correct kana advances the visible cursor', async () => {
     const wrapper = mountPracticeHarness()
 
@@ -209,9 +256,32 @@ describe('SettingsPanel component behavior', () => {
   it('switches mode through the settings action', async () => {
     const wrapper = mountSettingsPanel()
 
+    await wrapper.findAll('button').find((button) => button.text() === 'Hiragana')!.trigger('click')
     await wrapper.findAll('button').find((button) => button.text() === 'Katakana')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === 'Mixed')!.trigger('click')
 
-    expect(wrapper.emitted('update:settings')).toEqual([[{ mode: 'katakana' }]])
+    expect(wrapper.emitted('update:settings')).toEqual([
+      [{ mode: 'hiragana' }],
+      [{ mode: 'katakana' }],
+      [{ mode: 'mixed' }],
+    ])
+  })
+
+  it('toggling word separator emits boolean showWordSeparator', async () => {
+    const wrapper = mountSettingsPanel()
+    const checkbox = wrapper.find('input[type="checkbox"]')
+
+    await checkbox.setValue(false)
+
+    expect(wrapper.emitted('update:settings')).toEqual([[{ showWordSeparator: false }]])
+  })
+
+  it('changing font emits update:kanaFont', async () => {
+    const wrapper = mountSettingsPanel()
+
+    await wrapper.find('select').setValue('mincho')
+
+    expect(wrapper.emitted('update:kanaFont')).toEqual([['mincho']])
   })
 
   it('calls the reset progress flow from the goals header', async () => {
@@ -221,6 +291,7 @@ describe('SettingsPanel component behavior', () => {
     await resetButton.trigger('click')
 
     expect(wrapper.emitted('resetProgress')).toHaveLength(1)
+    expect(wrapper.find('details.advanced-settings').attributes('open')).toBeUndefined()
   })
 
   it('keeps the goals panel closed by default', () => {
@@ -241,7 +312,11 @@ describe('SettingsPanel component behavior', () => {
 describe('App session behavior', () => {
   it('switching mode regenerates the visible practice batch', async () => {
     installLocalStorage()
-    const wrapper = mount(App)
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const wrapper = mount(App, {
+      global: { plugins: [pinia] },
+    })
 
     await wrapper.findAll('button').find((button) => button.text() === 'Katakana')!.trigger('click')
 

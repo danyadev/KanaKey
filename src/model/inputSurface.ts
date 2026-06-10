@@ -1,6 +1,7 @@
 import { splitKanaUnits } from './kana'
-import { buildEvaluation, JAPANESE_SPACE } from './trainer'
-import type { BatchEvaluation, PerKanaEvaluation, PracticeWord, WordTiming } from './types'
+import { buildEvaluation, JAPANESE_SPACE } from './evaluation'
+import type { BatchEvaluation, PerKanaEvaluation, WordTiming } from './evaluation'
+import type { PracticeWord } from './words'
 
 export type TargetKanaUnit = {
   kana: string
@@ -38,7 +39,14 @@ export type SurfaceWordView = {
   units: SurfaceUnitView[]
 }
 
-export function createInputSurfaceState(words: Array<Pick<PracticeWord, 'kana'>>, now: number | null = null): InputSurfaceState {
+type TargetWordInput = Array<Pick<PracticeWord, 'kana'>>
+
+type ShortcutEvent = Pick<KeyboardEvent, 'isComposing' | 'key' | 'metaKey' | 'ctrlKey'>
+
+export function createInputSurfaceState(
+  words: TargetWordInput,
+  now: number | null = null,
+): InputSurfaceState {
   const units = flattenTargetWords(words)
   return {
     units,
@@ -183,7 +191,10 @@ export function getCurrentWordRemainder(words: SurfaceWordView[]): string {
   return ''
 }
 
-export function shouldHandlePracticeShortcut(event: Pick<KeyboardEvent, 'isComposing' | 'key' | 'metaKey' | 'ctrlKey'>, composing: boolean): boolean {
+export function shouldHandlePracticeShortcut(
+  event: ShortcutEvent,
+  composing: boolean,
+): boolean {
   if (composing || event.isComposing) return false
   if (event.key === 'Escape') return true
   return event.key === 'Enter' && (event.metaKey || event.ctrlKey)

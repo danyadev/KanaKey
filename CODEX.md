@@ -96,11 +96,22 @@ export const ComponentName = defineComponent<Props>((props) => {
 }, { props: ['msg'] })
 ```
 
-Pinia is allowed if it makes settings, progress, sessions, or time tracking cleaner.
+Pinia is the session/controller layer. The main practice store coordinates settings, progress, the current
+batch, input surface state, evaluation results, and UI preferences through explicit actions.
 
-Model logic should stay pure and testable even if state moves to Pinia.
-Keep batch generation, progress transitions, evaluation, settings normalization, storage, and UI/session
-orchestration in focused modules with explicit actions.
+Model logic should stay pure and testable outside Pinia:
+- `src/model/batch.ts`: real-word batch generation and structured batch warnings
+- `src/model/progress.ts`: progress transitions, pass checks, target advancement, and practice time
+- `src/model/inputSurface.ts`: keybr-style input transitions and IME-safe typing state
+- `src/model/evaluation.ts`: batch evaluation and per-kana metrics
+- `src/model/settings.ts`: settings normalization and pass-goal change detection
+- `src/model/kana.ts`: kana order and kana utility helpers
+
+Human-readable session messages and view-model calculations belong outside low-level model modules.
+Storage should use small adapters so tests can use fake key-value storage instead of browser globals.
+
+Components should stay mostly presentational. App should initialize the store, wire actions into child
+components, and keep DOM focus behavior outside Pinia.
 
 ## Persistence
 

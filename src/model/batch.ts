@@ -1,15 +1,31 @@
 import { kanaScriptFor, splitKanaUnits } from './kana'
 import { getUnlockedKana } from './progress'
 import { normalizeSettings } from './settings'
-import type {
-  BatchResult,
-  BatchWarning,
-  KanaPracticeScript,
-  PracticeSettings,
-  PracticeWord,
-  ProgressState,
-  WordEntry,
-} from './types'
+import type { ProgressState } from './progress'
+import type { PracticeSettings } from './settings'
+import type { PracticeWord, WordEntry } from './words'
+
+export type KanaPracticeScript = 'hiragana' | 'katakana'
+
+export type BatchWarning =
+  | {
+    type: 'noEligibleWords'
+    script: KanaPracticeScript
+    targetKana: string
+  }
+  | {
+    type: 'duplicatedToFill'
+    script: KanaPracticeScript
+    targetKana: string
+    available: number
+    needed: number
+    duplicated: number
+  }
+
+export type BatchResult = {
+  words: PracticeWord[]
+  warnings: BatchWarning[]
+}
 
 type ScriptQuota = {
   script: KanaPracticeScript
@@ -47,16 +63,6 @@ export function generateBatch(
     eligibleWords,
     random,
   })
-}
-
-export function formatBatchWarning(warning: BatchWarning): string {
-  if (warning.type === 'noEligibleWords') {
-    return `No eligible real ${warning.script} words for ${warning.targetKana} yet.`
-  }
-
-  const wordLabel = warning.available === 1 ? 'word' : 'words'
-  const repeatLabel = warning.duplicated === 1 ? 'word' : 'words'
-  return `Only ${warning.available} eligible ${warning.script} ${wordLabel} for ${warning.targetKana}; repeated ${warning.duplicated} ${repeatLabel}.`
 }
 
 export function getEligibleTargetWords(

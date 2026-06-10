@@ -1,5 +1,15 @@
 import { getKanaOrder } from './kana'
-import type { PracticeMode, PracticeSettings } from './types'
+import type { PracticeMode } from './modes'
+
+export type PracticeSettings = {
+  mode: PracticeMode
+  batchSize: number
+  targetKpm: number
+  targetAccuracy: number
+  smoothingAppearanceCount: number
+  dailyPracticeMinutesGoal: number
+  showWordSeparator: boolean
+}
 
 export const STORAGE_VERSION = 2
 export const INITIAL_UNLOCKED_COUNT = 5

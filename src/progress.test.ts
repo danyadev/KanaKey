@@ -1,25 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 
+import { evaluateBatch, expectedText } from './model/evaluation'
 import {
-  DEFAULT_SETTINGS,
-  INITIAL_UNLOCKED_COUNT,
-  REQUIRED_APPEARANCE_COUNT,
   addPracticeTime,
   applyEvaluationToProgress,
   chooseNextTargetKana,
   createEmptyKanaStats,
   createInitialProgress,
-  evaluateBatch,
-  expectedText,
   getSmoothingAttempts,
   normalizePracticeTime,
-  normalizeSettings,
   refreshProgressPassFlags,
   refreshSmoothedStats,
-} from './trainer'
-import { loadSettings } from './storage'
-import type { KanaStats, PracticeSettings, PracticeWord } from './types'
+} from './model/progress'
+import type { KanaStats } from './model/progress'
+import {
+  DEFAULT_SETTINGS,
+  INITIAL_UNLOCKED_COUNT,
+  REQUIRED_APPEARANCE_COUNT,
+  normalizeSettings,
+} from './model/settings'
+import type { PracticeSettings } from './model/settings'
+import type { PracticeWord } from './model/words'
+import { createKanaKeyStorage } from './storage/kanaKeyStorage'
 
 const settings: PracticeSettings = {
   ...DEFAULT_SETTINGS,
@@ -51,7 +54,9 @@ describe('progress model', () => {
     installLocalStorage()
     localStorage.setItem('kanakey:settings', JSON.stringify({ batchSize: 42 }))
 
-    expect(loadSettings().batchSize).toBe(DEFAULT_SETTINGS.batchSize)
+    const storage = createKanaKeyStorage(localStorage)
+
+    expect(storage.loadSettings().batchSize).toBe(DEFAULT_SETTINGS.batchSize)
   })
 
   it('uses a fixed initial unlock count of 5', () => {

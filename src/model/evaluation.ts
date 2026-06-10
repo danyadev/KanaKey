@@ -1,5 +1,30 @@
 import { splitKanaUnits } from './kana'
-import type { BatchEvaluation, WordEntry } from './types'
+import type { WordEntry } from './words'
+
+export type PerKanaEvaluation = {
+  appearanceCount: number
+  correctCount: number
+  allocatedMs: number
+}
+
+export type BatchEvaluation = {
+  expected: string
+  actual: string
+  elapsedMs: number
+  totalExpectedKana: number
+  correctKanaCount: number
+  kpm: number
+  accuracy: number
+  perKana: Record<string, PerKanaEvaluation>
+  wordTimings: WordTiming[]
+}
+
+export type WordTiming = {
+  word: string
+  index: number
+  durationMs: number
+  completedAtMs: number
+}
 
 export const JAPANESE_SPACE = '　'
 

@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 
-import type { SessionResult } from '../../types'
+import type { SessionResult } from '../../model/progress'
 import './HistoryPanel.css'
 
 type HistoryPanelProps = {

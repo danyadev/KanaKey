@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { generateBatch, getEligibleTargetWords } from './model/batch'
+import { createInitialProgress } from './model/progress'
+import { DEFAULT_SETTINGS } from './model/settings'
+import type { PracticeSettings } from './model/settings'
+import type { WordEntry } from './model/words'
+import { formatBatchWarning } from './session/practiceMessages'
 import seedWords from './words.json'
-import {
-  DEFAULT_SETTINGS,
-  createInitialProgress,
-  formatBatchWarning,
-  generateBatch,
-  getEligibleTargetWords,
-} from './trainer'
-import type { PracticeSettings, WordEntry } from './types'
 
 const settings: PracticeSettings = {
   ...DEFAULT_SETTINGS,
