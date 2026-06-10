@@ -157,12 +157,6 @@ export const App = defineComponent((_props, _ctx) => {
     focusTypingBox()
   }
 
-  function startNewBatch() {
-    lastEvaluation.value = null
-    outcomeMessage.value = null
-    regenerateBatch({ focus: true })
-  }
-
   function updateSettings(patch: Partial<PracticeSettings>) {
     settings.value = {
       ...settings.value,
@@ -227,9 +221,8 @@ export const App = defineComponent((_props, _ctx) => {
   return () => (
     <main class={['shell', `kana-font-${kanaFont.value}`]}>
       <Hero
-        currentKana={summary.value.current}
-        targetKpm={settings.value.targetKpm}
-        accuracyPercent={accuracyPercent.value}
+        speedProgressPercent={passMeter.value.kpmPercent}
+        accuracyProgressPercent={passMeter.value.accuracyPercent}
         dailyProgressLabel={dailyProgress.value.label}
         dailyProgressPercent={dailyProgress.value.percent}
       />
@@ -237,9 +230,8 @@ export const App = defineComponent((_props, _ctx) => {
       <section class="trainer-layout">
         <PracticePanel
           surfaceWords={surfaceWords.value}
-          visualSeparator={settings.value.visualSeparator}
+          showWordSeparator={settings.value.showWordSeparator}
           warning={batch.value.warning}
-          canSubmit={canSubmit.value}
           typingBox={typingBox}
           currentKana={summary.value.current}
           compositionText={inputState.value.compositionText}
@@ -250,7 +242,6 @@ export const App = defineComponent((_props, _ctx) => {
           passMeter={passMeter.value}
           lastEvaluation={lastEvaluation.value}
           outcomeMessage={outcomeMessage.value}
-          onNewBatch={startNewBatch}
           onSubmit={() => submitBatch()}
           onClear={clearInput}
           onCommitInput={handleCommittedInput}

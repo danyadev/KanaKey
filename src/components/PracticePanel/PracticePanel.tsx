@@ -17,9 +17,8 @@ export type PassMeter = {
 
 type PracticePanelProps = {
   surfaceWords: SurfaceWordView[]
-  visualSeparator: string
+  showWordSeparator: boolean
   warning: string | null
-  canSubmit: boolean
   typingBox: Ref<HTMLTextAreaElement | null>
   currentKana: string
   compositionText: string
@@ -33,7 +32,6 @@ type PracticePanelProps = {
 }
 
 type PracticePanelEmits = {
-  newBatch: () => void
   submit: () => void
   clear: () => void
   commitInput: (value: string) => void
@@ -62,7 +60,16 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
           <p class="eyebrow">Practice line</p>
           <p class="practice-note">Use your Japanese IME. Type the underlined kana; separators are visual only.</p>
         </div>
-        <button type="button" class="ghost" onClick={() => ctx.emit('newBatch')}>New batch</button>
+      </div>
+
+      <div class="pass-card">
+        <div class="pass-card-head">
+          <span class="eyebrow">Current kana meter</span>
+          <strong class="kana-display">{props.currentKana}</strong>
+        </div>
+        <MeterRow label="KPM" width={props.passMeter.kpmPercent} value={`${props.passMeter.kpm}/${props.targetKpm}`} />
+        <MeterRow label="Accuracy" width={props.passMeter.accuracyPercent} value={`${props.passMeter.accuracy}%/${props.targetAccuracyPercent}%`} />
+        <MeterRow label="Appearances" width={props.passMeter.appearancesPercent} value={`${props.passMeter.appearances}/${props.requiredAppearanceCount}`} />
       </div>
 
       <div class="typing-surface kana-display" aria-label="Current practice words" onClick={focusInput}>
@@ -76,8 +83,8 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
                 {unit.kana}
               </span>
             ))}
-            {wordIndex < props.surfaceWords.length - 1 && (
-              <span class="visual-separator" aria-hidden="true">{props.visualSeparator}</span>
+            {props.showWordSeparator && wordIndex < props.surfaceWords.length - 1 && (
+              <span class="visual-separator" aria-hidden="true">·</span>
             )}
           </span>
         ))}
@@ -93,6 +100,8 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
         spellcheck={false}
         autocomplete="off"
         autocapitalize="off"
+        autocorrect="off"
+        aria-autocomplete="none"
         aria-label="Japanese IME input capture"
         onInput={consumeInput}
         onCompositionstart={() => ctx.emit('compositionStart')}
@@ -116,22 +125,6 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
         }}
       />
 
-      <div class="actions">
-        <button type="button" class="primary" disabled={!props.canSubmit} onClick={() => ctx.emit('submit')}>Submit completed batch</button>
-        <button type="button" class="ghost" disabled={props.surfaceWords.length === 0} onClick={() => ctx.emit('clear')}>Clear attempt</button>
-        <p class="hint">Wrong kana are recorded, discarded from progress, and must be corrected before the caret advances.</p>
-      </div>
-
-      <div class="pass-card">
-        <div class="pass-card-head">
-          <span class="eyebrow">Current kana meter</span>
-          <strong class="kana-display">{props.currentKana}</strong>
-        </div>
-        <MeterRow label="KPM" width={props.passMeter.kpmPercent} value={`${props.passMeter.kpm}/${props.targetKpm}`} />
-        <MeterRow label="Accuracy" width={props.passMeter.accuracyPercent} value={`${props.passMeter.accuracy}%/${props.targetAccuracyPercent}%`} />
-        <MeterRow label="Appearances" width={props.passMeter.appearancesPercent} value={`${props.passMeter.appearances}/${props.requiredAppearanceCount}`} />
-      </div>
-
       {props.lastEvaluation && (
         <div class="result-strip">
           <span>Speed <strong>{Math.round(props.lastEvaluation.kpm)}</strong> kana/min</span>
@@ -146,9 +139,8 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
 }, {
   props: [
     'surfaceWords',
-    'visualSeparator',
+    'showWordSeparator',
     'warning',
-    'canSubmit',
     'typingBox',
     'currentKana',
     'compositionText',
@@ -160,7 +152,7 @@ export const PracticePanel = defineComponent<PracticePanelProps, PracticePanelEm
     'lastEvaluation',
     'outcomeMessage',
   ],
-  emits: ['newBatch', 'submit', 'clear', 'commitInput', 'compositionStart', 'compositionUpdate', 'compositionEnd'],
+  emits: ['submit', 'clear', 'commitInput', 'compositionStart', 'compositionUpdate', 'compositionEnd'],
 })
 
 type MeterRowProps = {

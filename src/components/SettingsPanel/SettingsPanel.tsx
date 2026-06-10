@@ -31,9 +31,9 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
           Batch size
           <input value={props.settings.batchSize} type="number" min="1" max="50" onChange={(event) => updateSettings(ctx, { batchSize: readNumber(event) })} />
         </label>
-        <label>
-          Visual separator
-          <input value={props.settings.visualSeparator} type="text" maxlength="4" onChange={(event) => updateSettings(ctx, { visualSeparator: readText(event) })} />
+        <label class="check">
+          <input checked={props.settings.showWordSeparator} type="checkbox" onChange={(event) => updateSettings(ctx, { showWordSeparator: readChecked(event) })} />
+          Show word separator
         </label>
         <label>
           Kana font
@@ -45,8 +45,15 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
         </label>
       </div>
 
-      <details class="advanced-settings" open>
-        <summary>Goals</summary>
+      <details class="advanced-settings">
+        <summary>
+          <span>Goals</span>
+          <button type="button" class="danger" onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            ctx.emit('resetProgress')
+          }}>Reset progress</button>
+        </summary>
         <div class="advanced-grid">
           <label>
             Speed goal kana/min
@@ -68,14 +75,8 @@ export const SettingsPanel = defineComponent<SettingsPanelProps, SettingsPanelEm
             Smoothing appearances
             <input value={props.settings.smoothingAppearanceCount} type="number" min="1" max="500" onChange={(event) => updateSettings(ctx, { smoothingAppearanceCount: readNumber(event) })} />
           </label>
-          <label>
-            Initial unlocked kana on reset
-            <input value={props.settings.initialUnlockedCount} type="number" min="1" max="160" onChange={(event) => updateSettings(ctx, { initialUnlockedCount: readNumber(event) })} />
-          </label>
         </div>
       </details>
-
-      <button type="button" class="danger" onClick={() => ctx.emit('resetProgress')}>Reset progress</button>
     </aside>
   )
 }, {
@@ -91,8 +92,8 @@ function readNumber(event: Event): number {
   return Number((event.target as HTMLInputElement).value)
 }
 
-function readText(event: Event): string {
-  return (event.target as HTMLInputElement).value
+function readChecked(event: Event): boolean {
+  return (event.target as HTMLInputElement).checked
 }
 
 function readKanaFont(event: Event): KanaFontChoice {

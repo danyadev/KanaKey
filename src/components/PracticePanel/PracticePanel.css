@@ -3,7 +3,6 @@
 }
 
 .practice-topline,
-.actions,
 .pass-card-head {
   display: flex;
   gap: 12px;
@@ -11,12 +10,34 @@
   justify-content: space-between;
 }
 
-.practice-note,
-.hint {
+.practice-note {
   margin: 0;
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.4;
+}
+
+.pass-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: rgba(234, 216, 187, 0.42);
+}
+
+.pass-card-head {
+  align-items: center;
+}
+
+.pass-card-head .eyebrow {
+  margin: 0;
+}
+
+.pass-card-head strong {
+  font-size: 1.55rem;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .typing-surface {
@@ -25,9 +46,10 @@
   flex-wrap: wrap;
   gap: 10px 13px;
   align-items: center;
-  min-height: 104px;
+  justify-content: center;
+  min-height: 112px;
   margin-top: 12px;
-  padding: 18px 17px;
+  padding: 20px 17px;
   border: 1px solid rgba(60, 45, 26, 0.14);
   border-radius: 16px;
   background:
@@ -53,7 +75,6 @@
   display: inline-block;
   min-width: 0.72em;
   padding: 0 1px 5px;
-  border-bottom: 2px solid transparent;
 }
 
 .surface-kana.completed {
@@ -65,7 +86,6 @@
 }
 
 .surface-kana.current {
-  border-bottom-color: var(--sea);
   color: var(--ink);
 }
 
@@ -153,35 +173,6 @@
   color: #365c34;
 }
 
-.actions {
-  align-items: center;
-  justify-content: flex-start;
-  margin-top: 10px;
-}
-
-.pass-card {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  background: rgba(234, 216, 187, 0.42);
-}
-
-.pass-card-head {
-  align-items: center;
-}
-
-.pass-card-head .eyebrow {
-  margin: 0;
-}
-
-.pass-card-head strong {
-  font-size: 1.55rem;
-  font-weight: 500;
-  line-height: 1;
-}
-
 .meter-row {
   display: grid;
   grid-template-columns: 86px minmax(80px, 1fr) 88px;
@@ -236,8 +227,7 @@
     padding: 16px;
   }
 
-  .practice-topline,
-  .actions {
+  .practice-topline {
     align-items: stretch;
     flex-direction: column;
   }

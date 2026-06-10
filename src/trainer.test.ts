@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 
+import seedWords from './words.json'
 import type { KanaStats, PracticeSettings, WordEntry } from './types'
 import {
   addPracticeTime,
@@ -12,6 +14,7 @@ import {
   expectedText,
   generateBatch,
   getSmoothingAttempts,
+  INITIAL_UNLOCKED_COUNT,
   isWordUnlocked,
   normalizePracticeTime,
   normalizeSettings,
@@ -46,22 +49,30 @@ describe('trainer logic', () => {
     installLocalStorage()
   })
 
-  it('normalizes settings and migrates legacy goal fields into safe bounds', () => {
+  it('normalizes v2 settings into safe bounds without legacy field support', () => {
     const normalized = normalizeSettings({
       batchSize: -5,
       targetAccuracy: 2,
       smoothingWindow: 0,
       minAttemptsPerKana: 7,
       mode: 'invalid',
-      visualSeparator: '-----',
+      showWordSeparator: false,
     } as unknown as Partial<PracticeSettings>)
 
     expect(normalized.batchSize).toBe(1)
     expect(normalized.targetAccuracy).toBe(1)
-    expect(normalized.smoothingAppearanceCount).toBe(1)
-    expect(normalized.requiredAppearanceCount).toBe(7)
+    expect(normalized.smoothingAppearanceCount).toBe(DEFAULT_SETTINGS.smoothingAppearanceCount)
+    expect(normalized.requiredAppearanceCount).toBe(DEFAULT_SETTINGS.requiredAppearanceCount)
     expect(normalized.mode).toBe('hiragana')
-    expect(normalized.visualSeparator).toBe(DEFAULT_SETTINGS.visualSeparator)
+    expect(normalized.showWordSeparator).toBe(false)
+  })
+
+  it('uses a fixed initial unlock count of 5', () => {
+    const progress = createInitialProgress(settings)
+
+    expect(progress.unlockedCountByMode.hiragana).toBe(INITIAL_UNLOCKED_COUNT)
+    expect(progress.unlockedCountByMode.katakana).toBe(INITIAL_UNLOCKED_COUNT)
+    expect(progress.unlockedCountByMode.mixed).toBe(INITIAL_UNLOCKED_COUNT)
   })
 
   it('checks unlocked words by visible kana units', () => {
@@ -72,14 +83,12 @@ describe('trainer logic', () => {
   it('generates normal batches from eligible real words only', () => {
     const progress = createInitialProgress(settings)
     const batch = generateBatch(words, settings, progress, fixedRandom)
+    const unlocked = new Set(progress.currentTargetKanaByMode.hiragana === 'あ' ? ['あ', 'い', 'し', 'き', 'か'] : [])
 
     expect(batch.words).toHaveLength(3)
-    expect(batch.warning).toBeNull()
     expect(batch.words.every((word) => !word.synthetic)).toBe(true)
     expect(batch.words.every((word) => word.kana.includes('あ'))).toBe(true)
-    expect(batch.words.every((word) => isWordUnlocked(word, new Set(progress.currentTargetKanaByMode.hiragana === 'あ'
-      ? ['あ', 'い', 'し', 'き', 'か', 'こ', 'う', 'お', 'え', 'く', 'さ', 'つ']
-      : [])))).toBe(true)
+    expect(batch.words.every((word) => isWordUnlocked(word, unlocked))).toBe(true)
   })
 
   it('duplicates and shuffles eligible real words when requested batch size exceeds unique words', () => {
@@ -100,6 +109,17 @@ describe('trainer logic', () => {
     expect(batch.warning).toContain('No eligible real words')
   })
 
+  it('has initial katakana eligible real words', () => {
+    const katakanaSettings = { ...settings, mode: 'katakana' as const }
+    const progress = createInitialProgress(katakanaSettings)
+    const batch = generateBatch(seedWords as WordEntry[], katakanaSettings, progress, fixedRandom)
+
+    expect(progress.currentTargetKanaByMode.katakana).toBe('ス')
+    expect(batch.words.length).toBeGreaterThan(0)
+    expect(batch.words.every((word) => word.kana.includes('ス'))).toBe(true)
+    expect(batch.words.every((word) => isWordUnlocked(word, new Set(['ス', 'キ', 'ー', 'バ', 'パ'])))).toBe(true)
+  })
+
   it('evaluates kana per minute, appearance counts, and allocated time', () => {
     const evaluation = evaluateBatch('あい　あお', 'あい あえ', 60_000)
 
@@ -108,6 +128,17 @@ describe('trainer logic', () => {
     expect(evaluation.kpm).toBe(3)
     expect(evaluation.accuracy).toBe(0.75)
     expect(evaluation.perKana['お']).toEqual({ appearanceCount: 1, correctCount: 0, allocatedMs: 15000 })
+  })
+
+  it('updates proxy-wrapped progress without DataCloneError', () => {
+    const progress = reactive(createInitialProgress(settings))
+    const batch = [practiceWord('ai', 'あい')]
+    const evaluation = evaluateBatch(expectedText(batch), expectedText(batch), 30_000)
+
+    expect(() => applyEvaluationToProgress(progress, settings, evaluation, batch, 100)).not.toThrow()
+    const next = applyEvaluationToProgress(progress, settings, evaluation, batch, 100)
+    expect(next).not.toBe(progress)
+    expect(next.kanaStats['あ'].appearances).toBe(1)
   })
 
   it('updates shared per-kana stats across modes and keeps hiragana and katakana separate', () => {
@@ -162,11 +193,11 @@ describe('trainer logic', () => {
   })
 
   it('unlocks next kana when every unlocked kana passes', () => {
-    const progress = createInitialProgress({ ...settings, initialUnlockedCount: 2 })
-    for (const kana of ['あ', 'い']) markPassed(progress.kanaStats[kana], settings)
+    const progress = createInitialProgress(settings)
+    for (const kana of ['あ', 'い', 'し', 'き', 'か']) markPassed(progress.kanaStats[kana], settings)
 
-    expect(chooseNextTargetKana(progress, { ...settings, initialUnlockedCount: 2 })).toBe('し')
-    expect(progress.unlockedCountByMode.hiragana).toBe(3)
+    expect(chooseNextTargetKana(progress, settings)).toBe('こ')
+    expect(progress.unlockedCountByMode.hiragana).toBe(6)
   })
 
   it('recomputes pass flags for changed goals without mutating counts or history', () => {
@@ -184,49 +215,13 @@ describe('trainer logic', () => {
       wordTimings: [],
     })
 
-    const next = refreshProgressPassFlags(progress, { ...settings, targetKpm: 500 })
+    const next = refreshProgressPassFlags(reactive(progress), { ...settings, targetKpm: 500 })
 
     expect(progress.kanaStats['あ'].passed).toBe(true)
     expect(next.kanaStats['あ'].passed).toBe(false)
     expect(next.kanaStats['あ'].appearances).toBe(settings.requiredAppearanceCount)
     expect(next.kanaStats['あ'].history).toHaveLength(1)
     expect(next.sessionHistory).toEqual(progress.sessionHistory)
-  })
-
-  it('migrates v1 localStorage settings and mode-scoped progress into v2 shared progress', () => {
-    localStorage.setItem('kanakey:v1:settings', JSON.stringify({
-      mode: 'hiragana',
-      minAttemptsPerKana: 6,
-      smoothingWindow: 8,
-      targetKpm: 90,
-    }))
-    localStorage.setItem('kanakey:v1:progress', JSON.stringify({
-      mode: 'hiragana',
-      unlockedCountByMode: { hiragana: 2, katakana: 2, mixed: 2 },
-      currentTargetKanaByMode: { hiragana: 'あ', katakana: 'ス', mixed: 'あ' },
-      kanaStatsByMode: {
-        hiragana: {
-          あ: {
-            attempts: 1,
-            exposures: 2,
-            correct: 1,
-            incorrect: 1,
-            recentAttempts: [{ timestamp: 10, exposures: 2, correct: 1, incorrect: 1, kpm: 60, accuracy: 0.5 }],
-            lastSeenAt: 10,
-          },
-        },
-      },
-      sessionHistory: [],
-    }))
-
-    const migratedSettings = loadSettings()
-    const migratedProgress = loadProgress(migratedSettings)
-
-    expect(migratedSettings.requiredAppearanceCount).toBe(6)
-    expect(migratedSettings.smoothingAppearanceCount).toBe(8)
-    expect(migratedProgress.kanaStats['あ'].appearances).toBe(2)
-    expect(migratedProgress.kanaStats['あ'].history[0].attemptNumber).toBe(1)
-    expect(migratedProgress.unlockedCountByMode.hiragana).toBe(2)
   })
 
   it('tracks practice time for today and overall', () => {

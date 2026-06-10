@@ -3,9 +3,8 @@ import { defineComponent } from 'vue'
 import './Hero.css'
 
 type HeroProps = {
-  currentKana: string
-  targetKpm: number
-  accuracyPercent: number
+  speedProgressPercent: number
+  accuracyProgressPercent: number
   dailyProgressLabel: string
   dailyProgressPercent: number
 }
@@ -20,17 +19,31 @@ export const Hero = defineComponent<HeroProps>((props, _ctx) => {
           Train one kana at a time through short Japanese words. The next kana unlocks only after the current set stays stable.
         </p>
       </div>
-      <div class="target-card kana-display">
-        <span>Current target</span>
-        <strong>{props.currentKana}</strong>
-        <small>{props.targetKpm} kana/min · {props.accuracyPercent}% accuracy</small>
-        <div class="daily-goal" aria-label="Daily practice progress">
-          <i style={{ width: `${props.dailyProgressPercent}%` }} />
-        </div>
-        <em>{props.dailyProgressLabel}</em>
+      <div class="goal-card" aria-label="Current goals progress">
+        <GoalLine label="Speed" percent={props.speedProgressPercent} />
+        <GoalLine label="Accuracy" percent={props.accuracyProgressPercent} />
+        <GoalLine label="Today" percent={props.dailyProgressPercent} value={props.dailyProgressLabel} />
       </div>
     </section>
   )
 }, {
-  props: ['currentKana', 'targetKpm', 'accuracyPercent', 'dailyProgressLabel', 'dailyProgressPercent'],
+  props: ['speedProgressPercent', 'accuracyProgressPercent', 'dailyProgressLabel', 'dailyProgressPercent'],
+})
+
+type GoalLineProps = {
+  label: string
+  percent: number
+  value?: string
+}
+
+const GoalLine = defineComponent<GoalLineProps>((props) => {
+  return () => (
+    <div class="goal-line">
+      <span>{props.label}</span>
+      <div class="goal-meter"><i style={{ width: `${props.percent}%` }} /></div>
+      <b>{props.value ?? `${props.percent}%`}</b>
+    </div>
+  )
+}, {
+  props: ['label', 'percent', 'value'],
 })

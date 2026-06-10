@@ -18,13 +18,12 @@ export type WordEntry = {
 export type PracticeSettings = {
   mode: PracticeMode
   batchSize: number
-  initialUnlockedCount: number
   targetKpm: number
   targetAccuracy: number
   requiredAppearanceCount: number
   smoothingAppearanceCount: number
   dailyPracticeMinutesGoal: number
-  visualSeparator: string
+  showWordSeparator: boolean
 }
 
 export type KanaAttempt = {

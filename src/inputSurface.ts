@@ -88,10 +88,14 @@ export function commitKanaInput(state: InputSurfaceState, value: string, now = D
 
     if (committedUnit !== current.kana) {
       const mistakesByIndex = [...next.mistakesByIndex]
+      const allocatedMsByIndex = [...next.allocatedMsByIndex]
       mistakesByIndex[next.cursorIndex] += 1
+      allocatedMsByIndex[next.cursorIndex] += Math.max(0, now - (next.lastUnitStartedAt ?? now))
       next = {
         ...next,
         mistakesByIndex,
+        allocatedMsByIndex,
+        lastUnitStartedAt: now,
         wrongCurrent: true,
       }
       continue

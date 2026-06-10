@@ -3,11 +3,9 @@ import { DEFAULT_SETTINGS, ensureProgress, normalizeSettings, STORAGE_VERSION } 
 
 const SETTINGS_KEY = `kanakey:v${STORAGE_VERSION}:settings`
 const PROGRESS_KEY = `kanakey:v${STORAGE_VERSION}:progress`
-const LEGACY_SETTINGS_KEYS = ['kanakey:v1:settings']
-const LEGACY_PROGRESS_KEYS = ['kanakey:v1:progress']
 
 export function loadSettings(): PracticeSettings {
-  return normalizeSettings(readFirstJson<Partial<PracticeSettings>>([SETTINGS_KEY, ...LEGACY_SETTINGS_KEYS]) ?? DEFAULT_SETTINGS)
+  return normalizeSettings(readJson<Partial<PracticeSettings>>(SETTINGS_KEY) ?? DEFAULT_SETTINGS)
 }
 
 export function saveSettings(settings: PracticeSettings): void {
@@ -15,7 +13,7 @@ export function saveSettings(settings: PracticeSettings): void {
 }
 
 export function loadProgress(settings: PracticeSettings): ProgressState {
-  return ensureProgress(readFirstJson<ProgressState>([PROGRESS_KEY, ...LEGACY_PROGRESS_KEYS]), settings)
+  return ensureProgress(readJson<ProgressState>(PROGRESS_KEY), settings)
 }
 
 export function saveProgress(progress: ProgressState): void {
@@ -24,15 +22,6 @@ export function saveProgress(progress: ProgressState): void {
 
 export function clearProgress(): void {
   localStorage.removeItem(PROGRESS_KEY)
-  for (const key of LEGACY_PROGRESS_KEYS) localStorage.removeItem(key)
-}
-
-function readFirstJson<T>(keys: string[]): T | null {
-  for (const key of keys) {
-    const value = readJson<T>(key)
-    if (value) return value
-  }
-  return null
 }
 
 function readJson<T>(key: string): T | null {

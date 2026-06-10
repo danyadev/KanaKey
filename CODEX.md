@@ -14,6 +14,8 @@ around the current target kana, measures typing stability, and returns to weak k
 
 Kana unlock order is custom, not alphabetical/gojūon order.
 
+Initial unlocked kana count is fixed at 5 for each mode.
+
 The progression line should be designed around word availability:
 early unlock steps should allow enough unique real-word practice for the default batch size.
 Some later sparse kana in the current seed list do not have enough unique words yet; for those kana,
@@ -95,9 +97,8 @@ Persist in localStorage:
 - progress
 - session history
 - practice time
-- first-run hint dismissal
 
-Stored data should be normalized on load.
+Stored data should be normalized on load for the current storage version.
 
 ## Input Surface
 
@@ -105,11 +106,11 @@ Practice input should behave like a keybr-style typing surface, not a visible te
 
 Use a hidden real input for IME capture. Render target words as the visible typing UI.
 
-- words are separated by an optional visual separator like a floating dot
+- words are separated by an optional centered dot separator
 - separator is visual only, not required to input
 - completed kana have muted color
 - future kana stay readable
-- current kana has a caret as underline
+- current kana has a caret underline
 - wrong input marks the required current kana red until it's written correctly
 
 During IME composition:
@@ -126,7 +127,7 @@ This model should support future per-kana timing from committed kana-unit bounda
 Non-UI tests should cover learning logic, progression, batch generation, metrics, persistence normalization, and other pure behavior.
 
 UI tests should cover runtime-critical behavior:
-typing, submit, reset/new batch, settings changes, focus behavior, and visible goal/progress updates.
+typing, IME composition, auto-submit, settings changes, focus behavior, and visible goal/progress updates.
 
 Prefer behavior tests over snapshots. Add or update tests when changing mechanics.
 

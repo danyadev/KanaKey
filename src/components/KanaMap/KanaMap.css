@@ -25,6 +25,10 @@
   min-width: 0;
 }
 
+.kana-row.katakana {
+  margin-top: 8px;
+}
+
 .row-label {
   display: grid;
   width: 28px;
