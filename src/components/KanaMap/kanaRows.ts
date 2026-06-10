@@ -54,6 +54,7 @@ const KATAKANA_ROWS = [
   { label: 'バ', kana: ['バ', 'ビ', 'ブ', 'ベ', 'ボ'] },
   { label: 'パ', kana: ['パ', 'ピ', 'プ', 'ペ', 'ポ'] },
   { label: '小', kana: ['ャ', 'ュ', 'ョ', 'ッ', 'ー'] },
+  { label: 'ァ', kana: ['ァ', 'ィ', 'ゥ', 'ェ', 'ォ'] },
 ]
 
 export function groupKanaRows(pills: KanaPill[]): KanaRow[] {

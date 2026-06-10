@@ -6,6 +6,7 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  base: './',
   plugins: [vue(), vueJsx({ include: /\.tsx$/ })],
   resolve: {
     alias: {

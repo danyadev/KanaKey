@@ -11,7 +11,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "import:words": "python3 scripts/import_words.py"
+    "words:generate": "python3 scripts/import_words.py",
+    "words:optimize": "python3 scripts/analyze_kana_order.py --script hiragana --min 10 --initial 5 --beam 500"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "6.0.7",

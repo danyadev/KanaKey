@@ -63,8 +63,8 @@ describe('practice store', () => {
 
     store.updateSettings({ mode: 'katakana' })
 
-    expect(store.progress).not.toBe(previousProgress)
-    expect(previousProgress.mode).toBe('hiragana')
+    expect(store.progress).toBe(previousProgress)
+    expect(previousProgress.mode).toBe('katakana')
     expect(store.progress.mode).toBe('katakana')
   })
 
@@ -81,7 +81,7 @@ describe('practice store', () => {
 
     store.updateSettings({ targetKpm: 2_000 })
 
-    expect(store.progress).not.toBe(progressBeforeBatchChange)
+    expect(store.progress).toBe(progressBeforeBatchChange)
     expect(store.progress.kanaStats['あ'].passed).toBe(false)
   })
 

@@ -1,10 +1,11 @@
 import { computed, defineComponent, shallowRef } from 'vue'
-import type { Ref } from 'vue'
+import { storeToRefs } from 'pinia'
 
-import type { BatchEvaluation } from '../../model/evaluation'
+import { useTypingFocus } from '../../composables/useTypingFocus'
 import { getCurrentWordRemainder } from '../../model/inputSurface'
-import type { SurfaceUnitView, SurfaceWordView } from '../../model/inputSurface'
+import type { SurfaceUnitView } from '../../model/inputSurface'
 import { getLastRomaji, romajiToKana } from '../../model/kana'
+import { usePracticeStore } from '../../stores/practiceStore'
 import './PracticePanel.css'
 
 export type PassMeter = {
@@ -14,21 +15,19 @@ export type PassMeter = {
   accuracyPercent: number
 }
 
-type PracticePanelProps = {
-  surfaceWords: SurfaceWordView[]
-  showWordSeparator: boolean
-  warningMessages: string[]
-  typingBox: Ref<HTMLInputElement | null>
-  currentKana: string
-  targetKpm: number
-  targetAccuracyPercent: number
-  passMeter: PassMeter
-  lastEvaluation: BatchEvaluation | null
-  outcomeMessage: string | null
-  commitInput: (value: string) => void
-}
-
-export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
+export const PracticePanel = defineComponent(() => {
+  const store = usePracticeStore()
+  const { focusTypingBox, typingBox } = useTypingFocus()
+  const {
+    accuracyPercent,
+    lastEvaluation,
+    outcomeMessage,
+    passMeter,
+    settings,
+    summary,
+    surfaceWords,
+    warningMessages,
+  } = storeToRefs(store)
   const composingText = shallowRef('')
   const composingKana = computed(() => romajiToKana(composingText.value))
   const isComposing = shallowRef(false)
@@ -47,13 +46,8 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
       return
     }
 
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-      return
-    }
-
-    event.preventDefault()
-
     if (event.key.length === 1 && (event.key >= 'a' && event.key <= 'z' || event.key >= 'A' && event.key <= 'Z')) {
+      event.preventDefault()
       composingText.value += event.key
 
       // IME doesn't automatically replace 'n' at the end while composing,
@@ -62,7 +56,7 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
         ? composingKana.value.slice(0, -1) + 'ん'
         : composingKana.value
 
-      if (kanaText === getCurrentWordRemainder(props.surfaceWords)) {
+      if (kanaText === getCurrentWordRemainder(surfaceWords.value)) {
         submitComposedText(kanaText)
       }
     }
@@ -78,21 +72,22 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
   }
 
   const submitComposedText = (kanaText: string) => {
-    const input = props.typingBox.value
+    const input = typingBox.value
     if (!input || kanaText.length === 0) return
 
-    props.commitInput(kanaText)
+    store.commitInput(kanaText)
     composingText.value = ''
     input.value = ''
+    focusTypingBox()
   }
 
   const focusInput = () => {
-    props.typingBox.value?.focus()
+    focusTypingBox()
   }
 
   const renderImeInput = () => (
     <input
-      ref={props.typingBox}
+      ref={typingBox}
       type="text"
       class={['hidden-ime-input', { composing: isComposing.value }]}
       spellcheck={false}
@@ -122,63 +117,49 @@ export const PracticePanel = defineComponent<PracticePanelProps>((props) => {
       <div class="pass-card">
         <div class="pass-card-head">
           <span class="eyebrow">Current kana meter</span>
-          <strong class="kana-display">{props.currentKana}</strong>
+          <strong class="kana-display">{summary.value.current}</strong>
         </div>
         <MeterRow
           label="KPM"
-          width={props.passMeter.kpmPercent}
-          value={`${props.passMeter.kpm} / ${props.targetKpm}`}
+          width={passMeter.value.kpmPercent}
+          value={`${passMeter.value.kpm} / ${settings.value.targetKpm}`}
         />
         <MeterRow
           label="Accuracy"
-          width={props.passMeter.accuracyPercent}
-          value={`${props.passMeter.accuracy}% / ${props.targetAccuracyPercent}%`}
+          width={passMeter.value.accuracyPercent}
+          value={`${passMeter.value.accuracy}% / ${accuracyPercent.value}%`}
         />
       </div>
 
       <div class="typing-surface kana-display" aria-label="Current practice words" onClick={focusInput}>
-        {props.surfaceWords.length === 0 && <span class="target-empty">No eligible real words yet</span>}
+        {surfaceWords.value.length === 0 && <span class="target-empty">No eligible real words yet</span>}
 
-        {props.surfaceWords.map((word, index) => (
+        {surfaceWords.value.map((word, index) => (
           <span key={`${word.word}-${word.index}`} class="surface-word">
             {word.units.map(renderKanaUnit)}
-            {props.showWordSeparator && (index < props.surfaceWords.length - 1) && (
+            {settings.value.showWordSeparator && (index < surfaceWords.value.length - 1) && (
               <span class="visual-separator">·</span>
             )}
           </span>
         ))}
       </div>
 
-      {props.warningMessages.map((message) => (
+      {warningMessages.value.map((message) => (
         <p key={message} class="warning">{message}</p>
       ))}
 
-      {props.lastEvaluation && (
+      {lastEvaluation.value && (
         <div class="result-strip">
-          <span>Speed <strong>{Math.round(props.lastEvaluation.kpm)}</strong> kana/min</span>
-          <span>Accuracy <strong>{Math.round(props.lastEvaluation.accuracy * 100)}</strong>%</span>
+          <span>Speed <strong>{Math.round(lastEvaluation.value.kpm)}</strong> kana/min</span>
+          <span>Accuracy <strong>{Math.round(lastEvaluation.value.accuracy * 100)}</strong>%</span>
           <span>
-            Correct <strong>{props.lastEvaluation.correctKanaCount}/{props.lastEvaluation.totalExpectedKana}</strong>
+            Correct <strong>{lastEvaluation.value.correctKanaCount}/{lastEvaluation.value.totalExpectedKana}</strong>
           </span>
         </div>
       )}
-      {props.outcomeMessage && <p class="outcome">{props.outcomeMessage}</p>}
+      {outcomeMessage.value && <p class="outcome">{outcomeMessage.value}</p>}
     </article>
   )
-}, {
-  props: [
-    'surfaceWords',
-    'showWordSeparator',
-    'warningMessages',
-    'typingBox',
-    'currentKana',
-    'targetKpm',
-    'targetAccuracyPercent',
-    'passMeter',
-    'lastEvaluation',
-    'outcomeMessage',
-    'commitInput',
-  ],
 })
 
 type MeterRowProps = {

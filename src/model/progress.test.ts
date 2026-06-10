@@ -144,7 +144,7 @@ describe('progress model', () => {
     expect(progress.currentTargetKanaByMode.hiragana).toBe('あ')
   })
 
-  it('recomputes pass flags for changed goals without mutating input progress', () => {
+  it('recomputes pass flags for changed goals in place', () => {
     const progress = createInitialProgress(settings)
     markPassed(progress.kanaStats['あ'], settings)
     progress.sessionHistory.push({
@@ -160,7 +160,7 @@ describe('progress model', () => {
 
     const next = refreshProgressPassFlags(reactive(progress), { ...settings, targetKpm: 2_000 })
 
-    expect(progress.kanaStats['あ'].passed).toBe(true)
+    expect(progress.kanaStats['あ'].passed).toBe(false)
     expect(next.kanaStats['あ'].passed).toBe(false)
     expect(next.kanaStats['あ'].appearances).toBe(REQUIRED_APPEARANCE_COUNT)
     expect(next.kanaStats['あ'].history).toHaveLength(1)

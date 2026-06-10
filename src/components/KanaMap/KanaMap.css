@@ -55,6 +55,7 @@
   background: rgba(255, 255, 255, 0.42);
   font-size: 1rem;
   font-weight: 400;
+  cursor: pointer;
 }
 
 .kana-pill.current {
@@ -80,6 +81,104 @@
   filter: grayscale(0.8);
 }
 
+.kana-pill.selected {
+  box-shadow: 0 0 0 2px rgba(60, 45, 26, 0.18), 0 8px 18px rgba(60, 45, 26, 0.12);
+  transform: translateY(-1px);
+}
+
+.kana-metrics {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.kana-metrics-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kana-metrics-head strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.kana-metrics-head span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kana-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.kana-metric {
+  border-radius: 12px;
+  padding: 8px;
+  background: rgba(30, 26, 20, 0.045);
+}
+
+.kana-metric small,
+.kana-trend,
+.empty.small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.kana-metric small {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.kana-metric b {
+  font-size: 0.98rem;
+}
+
+.kana-trend {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
+
+.kana-trend.up {
+  color: #365c34;
+}
+
+.kana-trend.down {
+  color: var(--vermilion);
+}
+
+.kana-chart {
+  display: flex;
+  align-items: end;
+  gap: 5px;
+  height: 74px;
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(60, 45, 26, 0.04), rgba(60, 45, 26, 0.08));
+}
+
+.kana-chart-bar {
+  flex: 1;
+  min-width: 8px;
+  border-radius: 999px 999px 3px 3px;
+  background: var(--vermilion);
+  opacity: 0.78;
+}
+
+.empty.small {
+  margin: 10px 0 0;
+}
+
 @media (max-width: 760px) {
   .progress-panel {
     padding: 16px;
@@ -87,5 +186,9 @@
 
   .kana-rows {
     grid-template-columns: 1fr;
+  }
+
+  .kana-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

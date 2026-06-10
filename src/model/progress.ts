@@ -157,11 +157,8 @@ export function setProgressMode(
   mode: PracticeMode,
 ): ProgressState {
   if (progress.mode === mode) return progress
-
-  return {
-    ...cloneProgressState(progress),
-    mode,
-  }
+  progress.mode = mode
+  return progress
 }
 
 export function applyEvaluationToProgress(
@@ -171,23 +168,22 @@ export function applyEvaluationToProgress(
   words: PracticeWord[],
   now = Date.now(),
 ): ProgressState {
-  const next = cloneProgressState(progress)
   const mode = settings.mode
-  const attemptNumber = next.nextAttemptNumber
-  next.mode = mode
-  next.nextAttemptNumber += 1
+  const attemptNumber = progress.nextAttemptNumber
+  progress.mode = mode
+  progress.nextAttemptNumber += 1
 
   for (const [kana, attempt] of Object.entries(evaluation.perKana)) {
-    applyKanaAttempt(next, settings, kana, attempt, attemptNumber, now)
+    applyKanaAttempt(progress, settings, kana, attempt, attemptNumber, now)
   }
 
-  next.sessionHistory = [
-    ...next.sessionHistory,
+  progress.sessionHistory.push(
     createSessionResult(progress, settings, evaluation, words, now),
-  ].slice(-100)
-  next.practiceTime = addPracticeTime(next.practiceTime, evaluation.elapsedMs, now)
+  )
+  progress.sessionHistory = progress.sessionHistory.slice(-100)
+  progress.practiceTime = addPracticeTime(progress.practiceTime, evaluation.elapsedMs, now)
 
-  return advanceTargetsAfterAttempt(next, settings)
+  return advanceTargetsAfterAttempt(progress, settings)
 }
 
 export function chooseNextTargetKana(
@@ -201,16 +197,14 @@ export function advanceTargetsAfterAttempt(
   progress: ProgressState,
   settings: PracticeSettings,
 ): ProgressState {
-  const next = cloneProgressState(progress)
-
   if (settings.mode === 'mixed') {
-    applyTargetAdvance(next, 'hiragana', getNextTargetAdvance(next, { ...settings, mode: 'hiragana' }))
-    applyTargetAdvance(next, 'katakana', getNextTargetAdvance(next, { ...settings, mode: 'katakana' }))
-    return next
+    applyTargetAdvance(progress, 'hiragana', getNextTargetAdvance(progress, { ...settings, mode: 'hiragana' }))
+    applyTargetAdvance(progress, 'katakana', getNextTargetAdvance(progress, { ...settings, mode: 'katakana' }))
+    return progress
   }
 
-  applyTargetAdvance(next, settings.mode, getNextTargetAdvance(next, settings))
-  return next
+  applyTargetAdvance(progress, settings.mode, getNextTargetAdvance(progress, settings))
+  return progress
 }
 
 export function refreshSmoothedStats(
@@ -251,14 +245,12 @@ export function refreshProgressPassFlags(
   progress: ProgressState,
   settings: PracticeSettings,
 ): ProgressState {
-  const next = cloneProgressState(progress)
-
-  for (const stats of Object.values(next.kanaStats)) {
+  for (const stats of Object.values(progress.kanaStats)) {
     refreshSmoothedStats(stats, settings)
   }
-  next.practiceTime = normalizePracticeTime(next.practiceTime)
+  progress.practiceTime = normalizePracticeTime(progress.practiceTime)
 
-  return next
+  return progress
 }
 
 export function isKanaPassed(stats: KanaStats, settings: PracticeSettings): boolean {
@@ -378,7 +370,7 @@ function getNextTargetAdvance(
   const unlocked = order.slice(0, unlockedCount)
 
   for (const kana of unlocked) {
-    const stats = cloneKanaStats(progress.kanaStats[kana] ?? createEmptyKanaStats(kana))
+    const stats = progress.kanaStats[kana] ?? createEmptyKanaStats(kana)
     refreshSmoothedStats(stats, settings)
     if (!stats.passed) return { targetKana: kana, unlockedCount }
   }
@@ -459,57 +451,6 @@ function normalizeKanaStats(
   }
 
   return refreshSmoothedStats(stats, settings)
-}
-
-function cloneProgressState(progress: ProgressState): ProgressState {
-  const modes: PracticeMode[] = ['hiragana', 'katakana', 'mixed']
-  const unlockedCountByMode = {} as ProgressState['unlockedCountByMode']
-  const currentTargetKanaByMode = {} as ProgressState['currentTargetKanaByMode']
-
-  for (const mode of modes) {
-    unlockedCountByMode[mode] = progress.unlockedCountByMode[mode]
-    currentTargetKanaByMode[mode] = progress.currentTargetKanaByMode[mode]
-  }
-
-  return {
-    mode: progress.mode,
-    unlockedCountByMode,
-    currentTargetKanaByMode,
-    kanaStats: Object.fromEntries(
-      Object.entries(progress.kanaStats).map(([kana, stats]) => [kana, cloneKanaStats(stats)]),
-    ),
-    sessionHistory: progress.sessionHistory.map(cloneSessionResult),
-    practiceTime: { ...progress.practiceTime },
-    nextAttemptNumber: progress.nextAttemptNumber,
-  }
-}
-
-function cloneKanaStats(stats: KanaStats): KanaStats {
-  return {
-    kana: stats.kana,
-    attempts: stats.attempts,
-    appearances: stats.appearances,
-    correct: stats.correct,
-    incorrect: stats.incorrect,
-    history: stats.history.map((attempt) => ({ ...attempt })),
-    smoothedKpm: stats.smoothedKpm,
-    smoothedAccuracy: stats.smoothedAccuracy,
-    passed: stats.passed,
-    lastSeenAt: stats.lastSeenAt,
-  }
-}
-
-function cloneSessionResult(session: SessionResult): SessionResult {
-  return {
-    timestamp: session.timestamp,
-    mode: session.mode,
-    targetKana: session.targetKana,
-    words: [...session.words],
-    elapsedMs: session.elapsedMs,
-    kpm: session.kpm,
-    accuracy: session.accuracy,
-    wordTimings: session.wordTimings.map((timing) => ({ ...timing })),
-  }
 }
 
 function normalizeKanaAttempt(raw: unknown): KanaAttempt | null {

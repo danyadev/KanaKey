@@ -1,5 +1,6 @@
 import { getKanaOrder } from '../model/kana'
-import type { KanaStats, ProgressState } from '../model/progress'
+import type { KanaAttempt, KanaStats, ProgressState } from '../model/progress'
+import { REQUIRED_APPEARANCE_COUNT } from '../model/settings'
 import type { PracticeSettings } from '../model/settings'
 import type { KanaPill } from '../components/KanaMap/kanaRows'
 
@@ -13,6 +14,25 @@ export type PassMeter = {
 export type DailyProgress = {
   label: string
   percent: number
+}
+
+export type KanaMetricPoint = {
+  label: string
+  kpm: number
+  accuracy: number
+}
+
+export type KanaMetrics = {
+  kana: string
+  status: string
+  recentKpm: number
+  bestKpm: number
+  accuracyPercent: number
+  appearances: number
+  requiredAppearances: number
+  trend: 'up' | 'down' | 'flat' | 'new'
+  trendLabel: string
+  chart: KanaMetricPoint[]
 }
 
 export function currentStats(
@@ -100,6 +120,44 @@ export function buildKanaPills(
   ]
 }
 
+export function buildKanaMetrics(
+  progress: ProgressState,
+  settings: PracticeSettings,
+  kana: string,
+): KanaMetrics {
+  const stats = progress.kanaStats[kana] ?? {
+    kana,
+    attempts: 0,
+    appearances: 0,
+    correct: 0,
+    incorrect: 0,
+    history: [],
+    smoothedKpm: 0,
+    smoothedAccuracy: 0,
+    passed: false,
+    lastSeenAt: null,
+  }
+  const status = buildKanaPills(progress, settings).find((pill) => pill.kana === kana)?.status ?? 'locked'
+  const chart = stats.history.slice(-8).map((attempt) => ({
+    label: `#${attempt.attemptNumber}`,
+    kpm: attemptKpm(attempt),
+    accuracy: attemptAccuracy(attempt),
+  }))
+
+  return {
+    kana,
+    status,
+    recentKpm: Math.round(stats.smoothedKpm),
+    bestKpm: Math.round(Math.max(0, ...stats.history.map(attemptKpm))),
+    accuracyPercent: Math.round(stats.smoothedAccuracy * 100),
+    appearances: stats.appearances,
+    requiredAppearances: REQUIRED_APPEARANCE_COUNT,
+    trend: learningTrend(chart),
+    trendLabel: learningTrendLabel(chart),
+    chart,
+  }
+}
+
 function buildScriptKanaPills(
   progress: ProgressState,
   settings: PracticeSettings,
@@ -131,6 +189,36 @@ function meterPercent(value: number, target: number): number {
 
 function formatMinutes(ms: number): string {
   return String(Math.floor(ms / 60000))
+}
+
+function attemptKpm(attempt: KanaAttempt): number {
+  if (attempt.correctCount <= 0) return 0
+  return attempt.correctCount / (Math.max(attempt.allocatedMs, 1) / 60000)
+}
+
+function attemptAccuracy(attempt: KanaAttempt): number {
+  if (attempt.appearanceCount <= 0) return 0
+  return attempt.correctCount / attempt.appearanceCount
+}
+
+function learningTrend(points: KanaMetricPoint[]): KanaMetrics['trend'] {
+  if (points.length < 3) return points.length === 0 ? 'new' : 'flat'
+
+  const midpoint = Math.floor(points.length / 2)
+  const earlier = average(points.slice(0, midpoint).map((point) => point.kpm))
+  const later = average(points.slice(midpoint).map((point) => point.kpm))
+  const delta = later - earlier
+
+  if (Math.abs(delta) < 5) return 'flat'
+  return delta > 0 ? 'up' : 'down'
+}
+
+function learningTrendLabel(points: KanaMetricPoint[]): string {
+  const trend = learningTrend(points)
+  if (trend === 'new') return 'No attempts yet'
+  if (trend === 'up') return 'Trending up'
+  if (trend === 'down') return 'Trending down'
+  return 'Stable'
 }
 
 function average(values: Array<number | undefined>): number {

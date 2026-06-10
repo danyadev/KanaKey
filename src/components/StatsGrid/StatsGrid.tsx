@@ -1,27 +1,22 @@
 import { defineComponent } from 'vue'
+import { storeToRefs } from 'pinia'
 
+import { usePracticeStore } from '../../stores/practiceStore'
 import './StatsGrid.css'
 
-type StatsGridProps = {
-  unlockedCount: number
-  weakCount: number
-  targetAppearances: number
-  todayMinutes: string
-  totalMinutes: string
-}
+export const StatsGrid = defineComponent(() => {
+  const store = usePracticeStore()
+  const { currentAppearances, progress, summary } = storeToRefs(store)
 
-export const StatsGrid = defineComponent<StatsGridProps>((props, _ctx) => {
   return () => (
     <section class="stats-grid">
-      <StatCard label="Unlocked" value={String(props.unlockedCount)} />
-      <StatCard label="Weak kana" value={String(props.weakCount)} />
-      <StatCard label="Target appearances" value={String(props.targetAppearances)} />
-      <StatCard label="Today" value={`${props.todayMinutes}m`} />
-      <StatCard label="Overall" value={`${props.totalMinutes}m`} />
+      <StatCard label="Unlocked" value={String(summary.value.unlocked.length)} />
+      <StatCard label="Weak kana" value={String(summary.value.weak.length)} />
+      <StatCard label="Target appearances" value={String(currentAppearances.value)} />
+      <StatCard label="Today" value={`${Math.floor(progress.value.practiceTime.todayMs / 60000)}m`} />
+      <StatCard label="Overall" value={`${Math.floor(progress.value.practiceTime.totalMs / 60000)}m`} />
     </section>
   )
-}, {
-  props: ['unlockedCount', 'weakCount', 'targetAppearances', 'todayMinutes', 'totalMinutes'],
 })
 
 type StatCardProps = {

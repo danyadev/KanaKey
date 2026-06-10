@@ -1,69 +1,67 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { describe, expect, it, vi } from 'vitest'
 
-import { DEFAULT_SETTINGS } from '../../model/settings'
-import type { PracticeSettings } from '../../model/settings'
+import { usePracticeStore } from '../../stores/practiceStore'
 import { SettingsPanel } from './SettingsPanel'
 
 describe('SettingsPanel component behavior', () => {
-  it('changes batch size through the settings action', async () => {
-    const wrapper = mountSettingsPanel()
+  it('changes batch size through the store action', async () => {
+    const { store, wrapper } = mountSettingsPanel()
     const input = wrapper.find('input[type="number"]')
 
     await input.setValue('12')
 
-    expect(wrapper.emitted('update:settings')).toEqual([[{ batchSize: 12 }]])
+    expect(store.settings.batchSize).toBe(12)
   })
 
-  it('switches mode through the settings action', async () => {
-    const wrapper = mountSettingsPanel()
+  it('switches mode through the store action', async () => {
+    const { store, wrapper } = mountSettingsPanel()
 
-    await wrapper.findAll('button').find((button) => button.text() === 'Hiragana')!.trigger('click')
     await wrapper.findAll('button').find((button) => button.text() === 'Katakana')!.trigger('click')
-    await wrapper.findAll('button').find((button) => button.text() === 'Mixed')!.trigger('click')
+    expect(store.settings.mode).toBe('katakana')
 
-    expect(wrapper.emitted('update:settings')).toEqual([
-      [{ mode: 'hiragana' }],
-      [{ mode: 'katakana' }],
-      [{ mode: 'mixed' }],
-    ])
+    await wrapper.findAll('button').find((button) => button.text() === 'Mixed')!.trigger('click')
+    expect(store.settings.mode).toBe('mixed')
   })
 
-  it('toggling word separator emits boolean showWordSeparator', async () => {
-    const wrapper = mountSettingsPanel()
+  it('toggling word separator updates boolean showWordSeparator', async () => {
+    const { store, wrapper } = mountSettingsPanel()
     const checkbox = wrapper.find('input[type="checkbox"]')
 
     await checkbox.setValue(false)
 
-    expect(wrapper.emitted('update:settings')).toEqual([[{ showWordSeparator: false }]])
+    expect(store.settings.showWordSeparator).toBe(false)
   })
 
-  it('changing font emits update:kanaFont', async () => {
-    const wrapper = mountSettingsPanel()
+  it('changing font updates kana font choice', async () => {
+    const { store, wrapper } = mountSettingsPanel()
 
     await wrapper.find('select').setValue('mincho')
 
-    expect(wrapper.emitted('update:kanaFont')).toEqual([['mincho']])
+    expect(store.kanaFont).toBe('mincho')
   })
 
-  it('calls resetProgress without opening the goals panel', async () => {
-    const wrapper = mountSettingsPanel()
+  it('resets progress without opening the goals panel', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    const { store, wrapper } = mountSettingsPanel()
+    store.progress.kanaStats['あ'].appearances = 4
     const resetButton = wrapper.find('summary .danger')
 
     await resetButton.trigger('click')
 
-    expect(wrapper.emitted('resetProgress')).toHaveLength(1)
+    expect(store.progress.kanaStats['あ'].appearances).toBe(0)
     expect(wrapper.find('details.advanced-settings').attributes('open')).toBeUndefined()
   })
 
   it('keeps the goals panel closed by default', () => {
-    const wrapper = mountSettingsPanel()
+    const { wrapper } = mountSettingsPanel()
 
     expect(wrapper.find('details.advanced-settings').attributes('open')).toBeUndefined()
   })
 
   it('keeps reset progress aligned in the goals header', () => {
-    const wrapper = mountSettingsPanel()
+    const { wrapper } = mountSettingsPanel()
     const summary = wrapper.find('details.advanced-settings > summary')
 
     expect(summary.find('span').text()).toBe('Goals')
@@ -71,12 +69,24 @@ describe('SettingsPanel component behavior', () => {
   })
 })
 
-function mountSettingsPanel(settings: PracticeSettings = DEFAULT_SETTINGS) {
-  return mount(SettingsPanel, {
-    props: {
-      settings,
-      accuracyPercent: 95,
-      kanaFont: 'gothic',
-    },
-  })
+function mountSettingsPanel() {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const store = usePracticeStore()
+  store.initialize({ keyValueStorage: createMapStorage(), words: [{ script: 'hiragana', kana: 'あい', meaning: 'あい', jlpt: 'N5' }] })
+
+  return {
+    store,
+    wrapper: mount(SettingsPanel, { global: { plugins: [pinia] } }),
+  }
+}
+
+function createMapStorage() {
+  const store = new Map<string, string>()
+
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value) },
+    removeItem: (key: string) => { store.delete(key) },
+  }
 }
