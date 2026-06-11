@@ -8,13 +8,6 @@ import { getLastRomaji, romajiToKana } from '../../model/kana'
 import { usePracticeStore } from '../../stores/practiceStore'
 import './PracticePanel.css'
 
-export type PassMeter = {
-  kpm: number
-  accuracy: number
-  kpmPercent: number
-  accuracyPercent: number
-}
-
 export const PracticePanel = defineComponent(() => {
   const store = usePracticeStore()
   const { focusTypingBox, typingBox } = useTypingFocus()
@@ -43,6 +36,10 @@ export const PracticePanel = defineComponent(() => {
     if (event.key === 'Enter' && !event.isComposing) {
       submitComposedText(composingKana.value)
       event.preventDefault()
+      return
+    }
+
+    if (event.ctrlKey || event.altKey || event.metaKey) {
       return
     }
 
