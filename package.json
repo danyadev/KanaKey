@@ -1,6 +1,7 @@
 {
   "name": "kanakey",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
     "node": "^22.22.1 || >=24",
@@ -11,22 +12,22 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "words:generate": "python3 scripts/import_words.py",
-    "words:optimize": "python3 scripts/analyze_kana_order.py --script hiragana --min 10 --initial 5 --beam 500"
+    "generate-words": "python3 scripts/generate_words.py",
+    "optimize-kana": "python3 scripts/optimize_kana_order.py --script hiragana --min 10 --initial 5 --beam 500 --sample 8"
   },
   "dependencies": {
-    "@vitejs/plugin-vue": "6.0.7",
     "pinia": "^3.0.4",
-    "vite": "8.0.16",
     "vue": "3.5.35"
   },
   "devDependencies": {
     "@types/node": "25.9.2",
+    "@vitejs/plugin-vue": "6.0.7",
     "@vitejs/plugin-vue-jsx": "5.1.5",
-    "@vue/test-utils": "^2.4.11",
+    "@vue/test-utils": "2.4.11",
     "@vue/tsconfig": "0.9.1",
-    "happy-dom": "^20.10.2",
+    "happy-dom": "20.10.2",
     "typescript": "6.0.3",
+    "vite": "8.0.16",
     "vitest": "4.1.8",
     "vue-tsc": "3.3.4"
   }

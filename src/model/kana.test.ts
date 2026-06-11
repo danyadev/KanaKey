@@ -24,26 +24,32 @@ describe('romajiToKana', () => {
   it('converts double consonants to small tsu', () => {
     expect(romajiToKana('kko')).toBe('っこ')
     expect(romajiToKana('gakkou')).toBe('がっこう')
-    expect(romajiToKana('matcha')).toBe('まっちゃ')
+    expect(romajiToKana('maccha')).toBe('まっちゃ')
   })
 
-  it('converts nn to ん', () => {
+  it('keeps the second n when it can start an n-row kana', () => {
     expect(romajiToKana('konnichiha')).toBe('こんにちは')
+    expect(romajiToKana('konna')).toBe('こんな')
+    expect(romajiToKana('onna')).toBe('おんな')
   })
 
-  it("converts n' to ん", () => {
+  it('keeps the second n before y so ny* digraphs still work', () => {
+    expect(romajiToKana('shinnyu')).toBe('しんにゅ')
+  })
+
+  it('consumes both n characters when nn is just explicit ん before another consonant', () => {
+    expect(romajiToKana('nnka')).toBe('んか')
+    expect(romajiToKana('nnshi')).toBe('んし')
+  })
+
+  it('uses apostrophe to force ん before vowel or y sounds', () => {
+    expect(romajiToKana("on'a")).toBe('おんあ')
     expect(romajiToKana("kin'youbi")).toBe('きんようび')
   })
 
   it('converts n before consonants such as nka to んか', () => {
     expect(romajiToKana('nka')).toBe('んか')
     expect(romajiToKana('kenka')).toBe('けんか')
-  })
-
-  it('keeps ny combinations as にゃ-style kana', () => {
-    expect(romajiToKana('nya')).toBe('にゃ')
-    expect(romajiToKana('nyu')).toBe('にゅ')
-    expect(romajiToKana('nyo')).toBe('にょ')
   })
 
   it('leaves unfinished romaji visible where expected', () => {

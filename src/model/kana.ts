@@ -202,12 +202,6 @@ export function romajiToKana(text: string): string {
       continue
     }
 
-    if (char === 't' && lowerText.slice(index + 1, index + 3) === 'ch') {
-      output += 'っ'
-      index++
-      continue
-    }
-
     const romaji = getFirstRomaji(lowerText.slice(index))
     if (romaji) {
       output += ROMAJI_TO_HIRAGANA[romaji]
@@ -215,9 +209,32 @@ export function romajiToKana(text: string): string {
       continue
     }
 
-    if (char === 'n' && (nextChar === 'n' || nextChar === '\'')) {
+    if (char === 'n' && nextChar === "'") {
       output += 'ん'
-      index += nextChar === 'n' && isVowel(lowerText[index + 2]) ? 1 : 2
+      index += 2
+      continue
+    }
+
+    /**
+     * `n` is ambiguous in romaji input.
+     *
+     * `nn` usually commits ん:
+     *   nnka -> んか
+     *
+     * But if the second `n` can begin an n-row syllable, keep it:
+     *   konnichiha -> ko + n + ni + chi + ha -> こんにちは
+     *   onna       -> o + n + na             -> おんな
+     *   shinnyu    -> shi + n + nyu          -> しんにゅ
+     *
+     * If the user really wants ん before a vowel/y sound, they can use apostrophe:
+     *   on'a  -> おんあ
+     *   kin'youbi -> きんようび
+     */
+    if (char === 'n' && nextChar === 'n') {
+      const afterNextChar = lowerText[index + 2]
+
+      output += 'ん'
+      index += afterNextChar && (isVowel(afterNextChar) || afterNextChar === 'y') ? 1 : 2
       continue
     }
 
@@ -259,8 +276,7 @@ function isDoubleConsonant(char: string, nextChar: string): boolean {
 }
 
 function isConsonant(char: string): boolean {
-  if (!(char >= 'a' && char <= 'z')) return false
-  return !isVowel(char)
+  return char >= 'a' && char <= 'z' && !isVowel(char)
 }
 
 function isVowel(char: string | undefined): boolean {
