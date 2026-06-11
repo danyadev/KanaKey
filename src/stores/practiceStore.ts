@@ -8,6 +8,7 @@ import {
   commitKanaInput,
   createInputSurfaceState,
   getSurfaceWordViews,
+  markCurrentKanaAttemptMistake,
 } from '../model/inputSurface'
 import type { InputSurfaceState } from '../model/inputSurface'
 import {
@@ -154,6 +155,10 @@ export const usePracticeStore = defineStore('practice', () => {
     if (inputState.value.completed) submitBatch(now)
   }
 
+  function markInputMistake(value: string) {
+    inputState.value = markCurrentKanaAttemptMistake(inputState.value, value)
+  }
+
   function resetProgress() {
     storageService().clearProgress()
     progress.value = createInitialProgress(settings.value)
@@ -205,6 +210,7 @@ export const usePracticeStore = defineStore('practice', () => {
     clearInput,
     commitInput,
     initialize,
+    markInputMistake,
     regenerateBatch,
     resetProgress,
     submitBatch,

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 
 import { evaluateBatch, expectedText } from './evaluation'
+import { getKanaOrder } from './kana'
 import {
   addPracticeTime,
   applyEvaluationToProgress,
@@ -135,13 +136,14 @@ describe('progress model', () => {
 
   it('target selection does not mutate progress', () => {
     const progress = createInitialProgress(settings)
-    for (const kana of ['あ', 'い', 'し', 'き', 'か']) {
+    const initialUnlocked = getKanaOrder('hiragana').slice(0, INITIAL_UNLOCKED_COUNT)
+    for (const kana of initialUnlocked) {
       markPassed(progress.kanaStats[kana], settings)
     }
 
-    expect(chooseNextTargetKana(progress, settings)).toBe('こ')
+    expect(chooseNextTargetKana(progress, settings)).toBe(getKanaOrder('hiragana')[INITIAL_UNLOCKED_COUNT])
     expect(progress.unlockedCountByMode.hiragana).toBe(5)
-    expect(progress.currentTargetKanaByMode.hiragana).toBe('あ')
+    expect(progress.currentTargetKanaByMode.hiragana).toBe(getKanaOrder('hiragana')[0])
   })
 
   it('recomputes pass flags for changed goals in place', () => {

@@ -8,10 +8,10 @@ import type { KanaStats } from '../model/progress'
 import type { WordEntry } from '../model/words'
 
 const words: WordEntry[] = [
-  word('hiragana', 'あい'),
-  word('hiragana', 'あし'),
-  word('hiragana', 'あき'),
-  word('katakana', 'スキー'),
+  word('hiragana', 'かい'),
+  word('hiragana', 'かし'),
+  word('hiragana', 'かな'),
+  word('katakana', 'スーツ'),
 ]
 
 describe('practice store', () => {
@@ -88,7 +88,7 @@ describe('practice store', () => {
   it('regenerates the batch and resets the input surface', () => {
     const store = usePracticeStore()
     store.initialize({ keyValueStorage: createMapStorage(), words })
-    store.commitInput('あ')
+    store.commitInput('か')
 
     expect(store.inputState.cursorIndex).toBe(1)
 
@@ -102,7 +102,7 @@ describe('practice store', () => {
     const store = usePracticeStore()
     store.initialize({ keyValueStorage: createMapStorage(), words })
 
-    store.commitInput('あ')
+    store.commitInput('か')
 
     expect(store.inputState.cursorIndex).toBe(1)
     expect(store.surfaceWords[0].units[0].status).toBe('completed')
@@ -113,14 +113,14 @@ describe('practice store', () => {
     const store = usePracticeStore()
     store.initialize({
       keyValueStorage: createMapStorage(),
-      words: [word('hiragana', 'あ')],
+      words: [word('hiragana', 'か')],
     })
     store.updateSettings({ batchSize: 1 })
 
-    store.commitInput('あ')
+    store.commitInput('か')
 
     expect(store.lastEvaluation?.correctKanaCount).toBe(1)
-    expect(store.progress.kanaStats['あ'].appearances).toBe(1)
+    expect(store.progress.kanaStats['か'].appearances).toBe(1)
     expect(store.inputState.cursorIndex).toBe(0)
     expect(store.batch.words).toHaveLength(1)
   })
@@ -142,7 +142,7 @@ describe('practice store', () => {
     const store = usePracticeStore()
     store.initialize({
       keyValueStorage: createMapStorage(),
-      words: [word('katakana', 'スキー')],
+      words: [word('katakana', 'スーツ')],
     })
     store.updateSettings({ mode: 'katakana', batchSize: 3 })
 

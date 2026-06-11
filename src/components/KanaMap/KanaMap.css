@@ -1,4 +1,5 @@
 .progress-panel {
+  position: relative;
   margin-top: 12px;
   padding: 14px;
 }
@@ -86,12 +87,20 @@
   transform: translateY(-1px);
 }
 
-.kana-metrics {
-  margin-top: 14px;
+.kana-metrics-popup {
+  position: absolute;
+  z-index: 5;
+  width: min(390px, calc(100% - 24px));
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 252, 244, 0.96);
+  box-shadow: 0 18px 50px rgba(60, 45, 26, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.kana-metrics-popup.low {
+  color: rgba(60, 45, 26, 0.72);
 }
 
 .kana-metrics-head {
@@ -102,7 +111,14 @@
 }
 
 .kana-metrics-head strong {
-  font-size: 2.4rem;
+  display: inline-grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--line);
+  font-size: 2rem;
   line-height: 1;
 }
 
@@ -112,6 +128,36 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.kana-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(30, 26, 20, 0.07);
+  color: var(--muted);
+}
+
+.kana-speed-line {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.kana-speed-line small,
+.kana-state-sentence,
+.kana-mistakes,
+.empty.small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.kana-state-sentence {
+  margin: 8px 0 0;
 }
 
 .kana-metric-grid {
@@ -128,7 +174,6 @@
 }
 
 .kana-metric small,
-.kana-trend,
 .empty.small {
   color: var(--muted);
   font-size: 0.8rem;
@@ -143,38 +188,47 @@
   font-size: 0.98rem;
 }
 
-.kana-trend {
-  margin: 10px 0 0;
-  font-weight: 700;
-}
-
-.kana-trend.up {
-  color: #365c34;
-}
-
-.kana-trend.down {
-  color: var(--vermilion);
-}
-
 .kana-chart {
-  display: flex;
-  align-items: end;
-  gap: 5px;
-  height: 74px;
+  display: block;
+  width: 100%;
+  height: auto;
   margin-top: 10px;
   border-radius: 12px;
-  padding: 8px;
   background: linear-gradient(180deg, rgba(60, 45, 26, 0.04), rgba(60, 45, 26, 0.08));
 }
 
-.kana-chart-bar {
-  flex: 1;
-  min-width: 8px;
-  border-radius: 999px 999px 3px 3px;
-  background: var(--vermilion);
-  opacity: 0.78;
+.kana-chart-axis {
+  stroke: rgba(60, 45, 26, 0.22);
+  stroke-width: 1;
 }
 
+.kana-chart-target {
+  stroke: rgba(60, 45, 26, 0.34);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.kana-chart-line {
+  fill: none;
+  stroke: var(--vermilion);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.kana-chart-dot {
+  fill: var(--vermilion);
+  stroke: rgba(255, 252, 244, 0.96);
+  stroke-width: 1.5;
+}
+
+.kana-chart-label {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: sans-serif;
+}
+
+.kana-mistakes,
 .empty.small {
   margin: 10px 0 0;
 }

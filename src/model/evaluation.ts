@@ -7,6 +7,14 @@ export type PerKanaEvaluation = {
   allocatedMs: number
 }
 
+export type KanaAttemptEvaluation = {
+  kana: string
+  firstTryCorrect: boolean
+  finalCorrect: boolean
+  reactionMs: number
+  mistakeKana: string | null
+}
+
 export type BatchEvaluation = {
   expected: string
   actual: string
@@ -16,6 +24,7 @@ export type BatchEvaluation = {
   kpm: number
   accuracy: number
   perKana: Record<string, PerKanaEvaluation>
+  kanaAttempts: KanaAttemptEvaluation[]
   wordTimings: WordTiming[]
 }
 
@@ -48,6 +57,7 @@ export function evaluateBatch(
   const totalExpectedKana = expectedUnits.length
   const allocatedPerKana = totalExpectedKana === 0 ? 0 : elapsedMs / totalExpectedKana
   const perKana: BatchEvaluation['perKana'] = {}
+  const kanaAttempts: KanaAttemptEvaluation[] = []
   let correctKanaCount = 0
 
   expectedUnits.forEach((unit, index) => {
@@ -58,6 +68,13 @@ export function evaluateBatch(
     perKana[unit].appearanceCount += 1
     perKana[unit].allocatedMs += allocatedPerKana
     if (isCorrect) perKana[unit].correctCount += 1
+    kanaAttempts.push({
+      kana: unit,
+      firstTryCorrect: isCorrect,
+      finalCorrect: isCorrect,
+      reactionMs: allocatedPerKana,
+      mistakeKana: isCorrect ? null : actualUnits[index] ?? null,
+    })
   })
 
   return buildEvaluation({
@@ -67,6 +84,7 @@ export function evaluateBatch(
     totalExpectedKana,
     correctKanaCount,
     perKana,
+    kanaAttempts,
     wordTimings: [],
   })
 }

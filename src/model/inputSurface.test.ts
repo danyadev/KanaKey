@@ -6,6 +6,7 @@ import {
   createInputSurfaceState,
   getCurrentWordRemainder,
   getSurfaceWordViews,
+  markCurrentKanaAttemptMistake,
 } from './inputSurface'
 
 const words = [
@@ -66,6 +67,23 @@ describe('input surface model behavior', () => {
       correctCount: 0,
       allocatedMs: 400,
     })
+  })
+
+  it('records first-try failure even when the final committed kana is correct', () => {
+    let state = createInputSurfaceState([{ kana: 'あ' }], 0)
+    state = markCurrentKanaAttemptMistake(state, 'お')
+    state = commitKanaInput(state, 'あ', 300)
+
+    const evaluation = buildInputEvaluation(state, 300)
+
+    expect(evaluation.kanaAttempts).toEqual([{
+      kana: 'あ',
+      firstTryCorrect: false,
+      finalCorrect: true,
+      reactionMs: 300,
+      mistakeKana: 'お',
+    }])
+    expect(evaluation.perKana['あ'].correctCount).toBe(0)
   })
 
   it('finalizes each word and moves on without requiring the visual separator', () => {

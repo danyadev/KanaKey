@@ -1,6 +1,6 @@
 import { splitKanaUnits } from './kana'
 import { buildEvaluation, JAPANESE_SPACE } from './evaluation'
-import type { BatchEvaluation, PerKanaEvaluation, WordTiming } from './evaluation'
+import type { BatchEvaluation, KanaAttemptEvaluation, PerKanaEvaluation, WordTiming } from './evaluation'
 import type { PracticeWord } from './words'
 
 export type TargetKanaUnit = {
@@ -17,6 +17,7 @@ export type InputSurfaceState = {
   cursorIndex: number
   acceptedUnits: string[]
   mistakesByIndex: number[]
+  firstMistakeByIndex: Array<string | null>
   allocatedMsByIndex: number[]
   wordTimings: WordTiming[]
   wrongCurrent: boolean
@@ -49,6 +50,7 @@ export function createInputSurfaceState(
     cursorIndex: 0,
     acceptedUnits: [],
     mistakesByIndex: Array.from({ length: units.length }, () => 0),
+    firstMistakeByIndex: Array.from({ length: units.length }, () => null),
     allocatedMsByIndex: Array.from({ length: units.length }, () => 0),
     wordTimings: [],
     wrongCurrent: false,
@@ -78,12 +80,15 @@ export function commitKanaInput(state: InputSurfaceState, value: string, now = D
 
     if (committedUnit !== current.kana) {
       const mistakesByIndex = [...next.mistakesByIndex]
+      const firstMistakeByIndex = [...next.firstMistakeByIndex]
       const allocatedMsByIndex = [...next.allocatedMsByIndex]
       mistakesByIndex[next.cursorIndex] += 1
+      firstMistakeByIndex[next.cursorIndex] ??= committedUnit
       allocatedMsByIndex[next.cursorIndex] += Math.max(0, now - (next.lastUnitStartedAt ?? now))
       next = {
         ...next,
         mistakesByIndex,
+        firstMistakeByIndex,
         allocatedMsByIndex,
         lastUnitStartedAt: now,
         wrongCurrent: true,
@@ -115,19 +120,44 @@ export function commitKanaInput(state: InputSurfaceState, value: string, now = D
   return next
 }
 
+export function markCurrentKanaAttemptMistake(
+  state: InputSurfaceState,
+  mistakeKana: string,
+): InputSurfaceState {
+  if (state.completed || state.cursorIndex >= state.units.length || mistakeKana.length === 0) {
+    return state
+  }
+
+  const firstMistakeByIndex = [...state.firstMistakeByIndex]
+  firstMistakeByIndex[state.cursorIndex] ??= mistakeKana
+  return { ...state, firstMistakeByIndex, wrongCurrent: true }
+}
+
 export function buildInputEvaluation(state: InputSurfaceState, completedAt = Date.now()): BatchEvaluation {
   const elapsedMs = state.startedAt === null ? 0 : Math.max(0, completedAt - state.startedAt)
   const perKana: Record<string, PerKanaEvaluation> = {}
+  const kanaAttempts: KanaAttemptEvaluation[] = []
   let correctKanaCount = 0
 
   state.units.forEach((unit, index) => {
     const wasCompleted = index < state.cursorIndex
-    const correct = wasCompleted && state.mistakesByIndex[index] === 0
+    const finalCorrect = wasCompleted && state.acceptedUnits[index] === unit.kana
+    const firstTryCorrect = finalCorrect
+      && state.mistakesByIndex[index] === 0
+      && state.firstMistakeByIndex[index] === null
+    const correct = firstTryCorrect
     if (correct) correctKanaCount += 1
     perKana[unit.kana] ??= { appearanceCount: 0, correctCount: 0, allocatedMs: 0 }
     perKana[unit.kana].appearanceCount += 1
     perKana[unit.kana].allocatedMs += state.allocatedMsByIndex[index]
     if (correct) perKana[unit.kana].correctCount += 1
+    kanaAttempts.push({
+      kana: unit.kana,
+      firstTryCorrect,
+      finalCorrect,
+      reactionMs: state.allocatedMsByIndex[index],
+      mistakeKana: state.firstMistakeByIndex[index],
+    })
   })
 
   return buildEvaluation({
@@ -137,6 +167,7 @@ export function buildInputEvaluation(state: InputSurfaceState, completedAt = Dat
     totalExpectedKana: state.units.length,
     correctKanaCount,
     perKana,
+    kanaAttempts,
     wordTimings: state.wordTimings,
   })
 }

@@ -1,5 +1,6 @@
 import { getKanaOrder } from '../model/kana'
-import type { KanaAttempt, KanaStats, ProgressState } from '../model/progress'
+import { createEmptyKanaStats } from '../model/progress'
+import type { KanaStats, KanaTargetAttempt, ProgressState } from '../model/progress'
 import { REQUIRED_APPEARANCE_COUNT } from '../model/settings'
 import type { PracticeSettings } from '../model/settings'
 import type { KanaPill } from '../components/KanaMap/kanaRows'
@@ -17,23 +18,40 @@ export type DailyProgress = {
 }
 
 export type KanaMetricPoint = {
-  label: string
+  attempt: number
   kpm: number
   accuracy: number
+  reactionMs: number
 }
 
 export type KanaMetrics = {
   kana: string
-  status: string
-  recentKpm: number
-  bestKpm: number
+  pillStatus: string
+  state: KanaMetricState
+  stateSentence: string
+  confidence: 'none' | 'low' | 'usable'
+  recentAttempts: number
+  recentKpm: number | null
+  bestKpm: number | null
   accuracyPercent: number
+  averageReactionMs: number | null
   appearances: number
   requiredAppearances: number
-  trend: 'up' | 'down' | 'flat' | 'new'
+  trend: 'up' | 'down' | 'flat' | 'unknown'
+  trendDelta: number | null
   trendLabel: string
   chart: KanaMetricPoint[]
+  commonMistakes: Array<{ kana: string, count: number }>
 }
+
+export type KanaMetricState =
+  | 'locked'
+  | 'introduced'
+  | 'learning'
+  | 'unlocked'
+  | 'weak'
+  | 'mastered'
+  | 'rusty'
 
 export function currentStats(
   progress: ProgressState,
@@ -125,36 +143,56 @@ export function buildKanaMetrics(
   settings: PracticeSettings,
   kana: string,
 ): KanaMetrics {
-  const stats = progress.kanaStats[kana] ?? {
-    kana,
-    attempts: 0,
-    appearances: 0,
-    correct: 0,
-    incorrect: 0,
-    history: [],
-    smoothedKpm: 0,
-    smoothedAccuracy: 0,
-    passed: false,
-    lastSeenAt: null,
-  }
-  const status = buildKanaPills(progress, settings).find((pill) => pill.kana === kana)?.status ?? 'locked'
-  const chart = stats.history.slice(-8).map((attempt) => ({
-    label: `#${attempt.attemptNumber}`,
-    kpm: attemptKpm(attempt),
-    accuracy: attemptAccuracy(attempt),
-  }))
+  const stats = progress.kanaStats[kana] ?? createEmptyKanaStats(kana)
+  const pillStatus = buildKanaPills(progress, settings).find((pill) => pill.kana === kana)?.status ?? 'locked'
+  const attempts = stats.attemptRecords
+  const recent = attempts.slice(-30)
+  const recentAttempts = recent.length
+  const confidence = metricConfidence(recentAttempts)
+  const recentKpm = confidence === 'none' ? null : kanaKpm(recent)
+  const bestKpm = bestRollingKpm(attempts)
+  const accuracy = recentAttempts === 0
+    ? 0
+    : recent.filter((attempt) => attempt.firstTryCorrect).length / recentAttempts
+  const averageReactionMs = averageReaction(recent)
+  const chart = buildMetricChart(attempts)
+  const trendDelta = chart.length < 4 ? null : trendFromChart(chart)
+  const trend = trendDelta === null
+    ? 'unknown'
+    : Math.abs(trendDelta) < 0.5
+      ? 'flat'
+      : trendDelta > 0
+        ? 'up'
+        : 'down'
+  const state = deriveKanaMetricState({
+    accuracy,
+    bestKpm,
+    confidence,
+    pillStatus,
+    recentAttempts,
+    recentKpm,
+    targetKpm: settings.targetKpm,
+    targetAccuracy: settings.targetAccuracy,
+  })
 
   return {
     kana,
-    status,
-    recentKpm: Math.round(stats.smoothedKpm),
-    bestKpm: Math.round(Math.max(0, ...stats.history.map(attemptKpm))),
-    accuracyPercent: Math.round(stats.smoothedAccuracy * 100),
+    pillStatus,
+    state,
+    stateSentence: stateSentence(state, confidence),
+    confidence,
+    recentAttempts,
+    recentKpm,
+    bestKpm,
+    accuracyPercent: Math.round(accuracy * 100),
+    averageReactionMs,
     appearances: stats.appearances,
     requiredAppearances: REQUIRED_APPEARANCE_COUNT,
-    trend: learningTrend(chart),
-    trendLabel: learningTrendLabel(chart),
+    trend,
+    trendDelta,
+    trendLabel: learningTrendLabel(trend, trendDelta),
     chart,
+    commonMistakes: commonMistakes(recent),
   }
 }
 
@@ -191,34 +229,118 @@ function formatMinutes(ms: number): string {
   return String(Math.floor(ms / 60000))
 }
 
-function attemptKpm(attempt: KanaAttempt): number {
-  if (attempt.correctCount <= 0) return 0
-  return attempt.correctCount / (Math.max(attempt.allocatedMs, 1) / 60000)
+function metricConfidence(attempts: number): KanaMetrics['confidence'] {
+  if (attempts < 10) return 'none'
+  if (attempts < 30) return 'low'
+  return 'usable'
 }
 
-function attemptAccuracy(attempt: KanaAttempt): number {
-  if (attempt.appearanceCount <= 0) return 0
-  return attempt.correctCount / attempt.appearanceCount
+function kanaKpm(attempts: KanaTargetAttempt[]): number | null {
+  const accepted = attempts.filter((attempt) => attempt.finalCorrect && attempt.reactionMs > 0)
+  if (accepted.length === 0) return null
+
+  return 60000 / average(accepted.map((attempt) => attempt.reactionMs))
 }
 
-function learningTrend(points: KanaMetricPoint[]): KanaMetrics['trend'] {
-  if (points.length < 3) return points.length === 0 ? 'new' : 'flat'
+function bestRollingKpm(attempts: KanaTargetAttempt[]): number | null {
+  const windowSize = 10
+  if (attempts.length < windowSize) return null
 
+  let best: number | null = null
+  for (let index = 0; index <= attempts.length - windowSize; index += 1) {
+    const value = kanaKpm(attempts.slice(index, index + windowSize))
+    if (value === null) continue
+    best = best === null ? value : Math.max(best, value)
+  }
+  return best
+}
+
+function buildMetricChart(attempts: KanaTargetAttempt[]): KanaMetricPoint[] {
+  const windowSize = 10
+  if (attempts.length < windowSize) return []
+
+  const points: KanaMetricPoint[] = []
+  for (let end = windowSize; end <= attempts.length; end += 1) {
+    const window = attempts.slice(end - windowSize, end)
+    const kpm = kanaKpm(window)
+    if (kpm === null) continue
+    points.push({
+      attempt: end,
+      kpm,
+      accuracy: window.filter((attempt) => attempt.firstTryCorrect).length / window.length,
+      reactionMs: average(window.map((attempt) => attempt.reactionMs)),
+    })
+  }
+  return points.slice(-40)
+}
+
+function trendFromChart(points: KanaMetricPoint[]): number {
   const midpoint = Math.floor(points.length / 2)
-  const earlier = average(points.slice(0, midpoint).map((point) => point.kpm))
-  const later = average(points.slice(midpoint).map((point) => point.kpm))
-  const delta = later - earlier
-
-  if (Math.abs(delta) < 5) return 'flat'
-  return delta > 0 ? 'up' : 'down'
+  const previous = points.slice(0, midpoint)
+  const recent = points.slice(midpoint)
+  return average(recent.map((point) => point.kpm)) - average(previous.map((point) => point.kpm))
 }
 
-function learningTrendLabel(points: KanaMetricPoint[]): string {
-  const trend = learningTrend(points)
-  if (trend === 'new') return 'No attempts yet'
-  if (trend === 'up') return 'Trending up'
-  if (trend === 'down') return 'Trending down'
+function learningTrendLabel(trend: KanaMetrics['trend'], delta: number | null): string {
+  if (trend === 'unknown' || delta === null) return 'Not enough data'
+  if (trend === 'up') return `+${delta.toFixed(1)} kpm`
+  if (trend === 'down') return `${delta.toFixed(1)} kpm`
   return 'Stable'
+}
+
+function averageReaction(attempts: KanaTargetAttempt[]): number | null {
+  const accepted = attempts.filter((attempt) => attempt.finalCorrect && attempt.reactionMs > 0)
+  return accepted.length === 0 ? null : average(accepted.map((attempt) => attempt.reactionMs))
+}
+
+function commonMistakes(attempts: KanaTargetAttempt[]): Array<{ kana: string, count: number }> {
+  const counts = new Map<string, number>()
+  for (const attempt of attempts) {
+    if (!attempt.mistakeKana) continue
+    counts.set(attempt.mistakeKana, (counts.get(attempt.mistakeKana) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .map(([kana, count]) => ({ kana, count }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 3)
+}
+
+function deriveKanaMetricState(input: {
+  accuracy: number
+  bestKpm: number | null
+  confidence: KanaMetrics['confidence']
+  pillStatus: string
+  recentAttempts: number
+  recentKpm: number | null
+  targetKpm: number
+  targetAccuracy: number
+}): KanaMetricState {
+  if (input.pillStatus === 'locked') return 'locked'
+  if (input.recentAttempts === 0) return 'introduced'
+  if (input.confidence === 'none') return 'introduced'
+  if (input.confidence === 'low') return 'learning'
+  if (input.bestKpm !== null && input.bestKpm >= input.targetKpm && (input.recentKpm ?? 0) < input.bestKpm * 0.75) {
+    return 'rusty'
+  }
+  if (input.accuracy < input.targetAccuracy || (input.recentKpm ?? 0) < input.targetKpm * 0.85) {
+    return 'weak'
+  }
+  if (input.accuracy >= input.targetAccuracy && (input.recentKpm ?? 0) >= input.targetKpm) {
+    return 'mastered'
+  }
+  return 'unlocked'
+}
+
+function stateSentence(state: KanaMetricState, confidence: KanaMetrics['confidence']): string {
+  if (state === 'locked') return 'This kana is locked.'
+  if (confidence === 'none') return 'Not enough data yet.'
+  if (confidence === 'low') return 'Low confidence: keep practicing this kana.'
+  if (state === 'mastered') return 'This kana is mastered recently.'
+  if (state === 'weak') return 'This kana needs more practice.'
+  if (state === 'rusty') return 'This kana used to be stronger and looks rusty.'
+  if (state === 'learning') return 'This kana is still being learned.'
+  return 'This kana is unlocked.'
 }
 
 function average(values: Array<number | undefined>): number {

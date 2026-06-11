@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { generateBatch, getEligibilityDiagnostics, getEligibleTargetWords } from './batch'
 import { createInitialProgress } from './progress'
+import { getKanaOrder } from './kana'
 import { DEFAULT_SETTINGS } from './settings'
 import type { PracticeSettings } from './settings'
 import type { WordEntry } from './words'
@@ -40,7 +41,7 @@ function sequenceRandom(values: number[]) {
 
 describe('batch generation', () => {
   it('draws unique eligible words for a single mode when enough words exist', () => {
-    const progress = createInitialProgress(settings)
+    const progress = progressFor(settings)
     const batch = generateBatch(hiraganaWords, settings, progress, fixedRandom)
     const uniqueKana = new Set(batch.words.map((wordEntry) => wordEntry.kana))
 
@@ -51,7 +52,7 @@ describe('batch generation', () => {
   })
 
   it('duplicates only the missing count when a single-mode pool is short', () => {
-    const progress = createInitialProgress(settings)
+    const progress = progressFor(settings)
     const batch = generateBatch(
       [hiraganaWords[0]],
       { ...settings, batchSize: 4 },
@@ -66,7 +67,7 @@ describe('batch generation', () => {
         type: 'duplicatedToFill',
         script: 'hiragana',
         targetKana: 'あ',
-        unlockedKana: ['あ', 'い', 'し', 'き', 'か'],
+        unlockedKana: getKanaOrder('hiragana'),
         totalTargetWords: 1,
         available: 1,
         needed: 4,
@@ -77,7 +78,7 @@ describe('batch generation', () => {
 
   it('does not warn about duplicates when mixed mode has enough words per script', () => {
     const mixedSettings = { ...settings, mode: 'mixed' as const, batchSize: 4 }
-    const progress = createInitialProgress(mixedSettings)
+    const progress = progressFor(mixedSettings)
     const random = sequenceRandom([0.1, 0.9, 0.1, 0.9, 0, 0, 0, 0, 0, 0])
     const batch = generateBatch([...hiraganaWords, ...katakanaWords], mixedSettings, progress, random)
     const hiraganaBatch = batch.words.filter((wordEntry) => wordEntry.script === 'hiragana')
@@ -93,7 +94,7 @@ describe('batch generation', () => {
 
   it('reports a katakana-only shortage in mixed mode', () => {
     const mixedSettings = { ...settings, mode: 'mixed' as const, batchSize: 4 }
-    const progress = createInitialProgress(mixedSettings)
+    const progress = progressFor(mixedSettings)
     const random = sequenceRandom([0.1, 0.9, 0.1, 0.9, 0, 0, 0, 0])
     const batch = generateBatch(
       [...hiraganaWords, katakanaWords[0]],
@@ -109,7 +110,7 @@ describe('batch generation', () => {
         type: 'duplicatedToFill',
         script: 'katakana',
         targetKana: 'ス',
-        unlockedKana: ['ス', 'キ', 'ー', 'バ', 'パ'],
+        unlockedKana: getKanaOrder('katakana'),
         totalTargetWords: 1,
         available: 1,
         needed: 2,
@@ -119,7 +120,7 @@ describe('batch generation', () => {
   })
 
   it('gives repeated words unique repetition ids', () => {
-    const progress = createInitialProgress(settings)
+    const progress = progressFor(settings)
     const batch = generateBatch(
       [hiraganaWords[0]],
       { ...settings, batchSize: 3 },
@@ -146,8 +147,8 @@ describe('batch generation', () => {
     expect(eligibleWords.every((wordEntry) => wordEntry.kana.includes('ス'))).toBe(true)
   })
 
-  it('diagnoses initial hiragana あ shortage as an unlocked-kana constraint', () => {
-    const progress = createInitialProgress(settings)
+  it('diagnoses hiragana target eligibility', () => {
+    const progress = progressFor(settings)
     const diagnostics = getEligibilityDiagnostics(
       seedWords as WordEntry[],
       progress,
@@ -156,12 +157,12 @@ describe('batch generation', () => {
     )
 
     expect(diagnostics.totalTargetWords).toBeGreaterThan(50)
-    expect(diagnostics.eligibleWords).toHaveLength(6)
-    expect(diagnostics.unlockedKana).toEqual(['あ', 'い', 'し', 'き', 'か'])
+    expect(diagnostics.eligibleWords.length).toBe(diagnostics.totalTargetWords)
+    expect(diagnostics.unlockedKana).toEqual(getKanaOrder('hiragana'))
   })
 
   it('uses a ranked candidate window before shuffling eligible words', () => {
-    const progress = createInitialProgress({ ...settings, batchSize: 2 })
+    const progress = progressFor({ ...settings, batchSize: 2 })
     const rankedWords = [
       word('hiragana', 'あい'),
       word('hiragana', 'あし'),
@@ -182,6 +183,8 @@ describe('batch generation', () => {
 
   it('returns structured noEligibleWords warnings', () => {
     const progress = createInitialProgress(settings)
+    progress.currentTargetKanaByMode.hiragana = 'あ'
+    progress.unlockedCountByMode.hiragana = getKanaOrder('hiragana').indexOf('あ') + 1
     const batch = generateBatch(
       [word('hiragana', 'ある')],
       settings,
@@ -195,7 +198,7 @@ describe('batch generation', () => {
         type: 'noEligibleWords',
         script: 'hiragana',
         targetKana: 'あ',
-        unlockedKana: ['あ', 'い', 'し', 'き', 'か'],
+        unlockedKana: getKanaOrder('hiragana').slice(0, getKanaOrder('hiragana').indexOf('あ') + 1),
         totalTargetWords: 1,
       },
     ])
@@ -227,4 +230,13 @@ function word(script: 'hiragana' | 'katakana', kana: string): WordEntry {
     meaning: kana,
     jlpt: 'N5',
   }
+}
+
+function progressFor(practiceSettings: PracticeSettings) {
+  const progress = createInitialProgress(practiceSettings)
+  progress.currentTargetKanaByMode.hiragana = 'あ'
+  progress.currentTargetKanaByMode.katakana = 'ス'
+  progress.unlockedCountByMode.hiragana = getKanaOrder('hiragana').length
+  progress.unlockedCountByMode.katakana = getKanaOrder('katakana').length
+  return progress
 }

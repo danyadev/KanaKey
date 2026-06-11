@@ -49,12 +49,20 @@ export const PracticePanel = defineComponent(() => {
 
       // IME doesn't automatically replace 'n' at the end while composing,
       // but we still want to automatically submit words like さん
-      const kanaText = event.key.toLowerCase() === 'n'
+      const hasTrailingN = composingKana.value.at(-1)?.toLowerCase() === 'n'
+      const kanaText = hasTrailingN
         ? composingKana.value.slice(0, -1) + 'ん'
         : composingKana.value
+      const remainder = getCurrentWordRemainder(surfaceWords.value)
 
-      if (kanaText === getCurrentWordRemainder(surfaceWords.value)) {
+      if (kanaText === remainder) {
         submitComposedText(kanaText)
+        return
+      }
+
+      if (!hasTrailingN && !/[a-z]/i.test(kanaText)) {
+        const mistakeKana = firstMismatchKana(kanaText, remainder)
+        if (mistakeKana) store.markInputMistake(mistakeKana)
       }
     }
   }
@@ -176,3 +184,10 @@ const MeterRow = defineComponent<MeterRowProps>((props) => {
 }, {
   props: ['label', 'width', 'value'],
 })
+
+function firstMismatchKana(input: string, expected: string): string | null {
+  for (let index = 0; index < input.length; index++) {
+    if (input[index] !== expected[index]) return input[index]
+  }
+  return null
+}

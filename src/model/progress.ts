@@ -19,6 +19,15 @@ export type KanaAttempt = {
   allocatedMs: number
 }
 
+export type KanaTargetAttempt = {
+  timestamp: number
+  attemptNumber: number
+  firstTryCorrect: boolean
+  finalCorrect: boolean
+  reactionMs: number
+  mistakeKana: string | null
+}
+
 export type KanaStats = {
   kana: string
   attempts: number
@@ -26,6 +35,7 @@ export type KanaStats = {
   correct: number
   incorrect: number
   history: KanaAttempt[]
+  attemptRecords: KanaTargetAttempt[]
   smoothedKpm: number
   smoothedAccuracy: number
   passed: boolean
@@ -72,6 +82,7 @@ export function createEmptyKanaStats(kana: string): KanaStats {
     correct: 0,
     incorrect: 0,
     history: [],
+    attemptRecords: [],
     smoothedKpm: 0,
     smoothedAccuracy: 0,
     passed: false,
@@ -175,6 +186,16 @@ export function applyEvaluationToProgress(
 
   for (const [kana, attempt] of Object.entries(evaluation.perKana)) {
     applyKanaAttempt(progress, settings, kana, attempt, attemptNumber, now)
+  }
+  for (const attempt of evaluation.kanaAttempts) {
+    recordKanaTargetAttempt(progress, attempt.kana, {
+      timestamp: now,
+      attemptNumber,
+      firstTryCorrect: attempt.firstTryCorrect,
+      finalCorrect: attempt.finalCorrect,
+      reactionMs: Math.max(0, attempt.reactionMs),
+      mistakeKana: attempt.mistakeKana,
+    })
   }
 
   progress.sessionHistory.push(
@@ -335,6 +356,17 @@ function applyKanaAttempt(
   progress.kanaStats[kana] = stats
 }
 
+function recordKanaTargetAttempt(
+  progress: ProgressState,
+  kana: string,
+  attempt: KanaTargetAttempt,
+): void {
+  const stats = progress.kanaStats[kana] ?? createEmptyKanaStats(kana)
+  stats.attemptRecords.push(attempt)
+  stats.attemptRecords = stats.attemptRecords.slice(-500)
+  progress.kanaStats[kana] = stats
+}
+
 function createSessionResult(
   progress: ProgressState,
   settings: PracticeSettings,
@@ -420,6 +452,9 @@ function normalizeKanaStats(
   const history = Array.isArray(input.history)
     ? input.history.map(normalizeKanaAttempt).filter(Boolean) as KanaAttempt[]
     : []
+  const attemptRecords = Array.isArray(input.attemptRecords)
+    ? input.attemptRecords.map(normalizeKanaTargetAttempt).filter(Boolean) as KanaTargetAttempt[]
+    : expandHistoryToTargetAttempts(history)
   const appearances = typeof input.appearances === 'number'
     ? Math.max(0, input.appearances)
     : history.reduce((sum, attempt) => sum + attempt.appearanceCount, 0)
@@ -436,6 +471,7 @@ function normalizeKanaStats(
     correct,
     incorrect,
     history,
+    attemptRecords,
     lastSeenAt: typeof input.lastSeenAt === 'number' ? input.lastSeenAt : null,
   }
 
@@ -448,6 +484,10 @@ function normalizeKanaStats(
       allocatedMs: 60_000,
     })
     stats.attempts = Math.max(stats.attempts, 1)
+  }
+
+  if (stats.attemptRecords.length === 0 && stats.history.length > 0) {
+    stats.attemptRecords = expandHistoryToTargetAttempts(stats.history)
   }
 
   return refreshSmoothedStats(stats, settings)
@@ -467,6 +507,34 @@ function normalizeKanaAttempt(raw: unknown): KanaAttempt | null {
     correctCount: clampInteger(input.correctCount ?? 0, 0, appearanceCount),
     allocatedMs: Math.max(0, typeof input.allocatedMs === 'number' ? input.allocatedMs : 0),
   }
+}
+
+function normalizeKanaTargetAttempt(raw: unknown): KanaTargetAttempt | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const input = raw as Partial<KanaTargetAttempt>
+  return {
+    timestamp: typeof input.timestamp === 'number' ? input.timestamp : Date.now(),
+    attemptNumber: typeof input.attemptNumber === 'number' ? input.attemptNumber : 1,
+    firstTryCorrect: input.firstTryCorrect === true,
+    finalCorrect: input.finalCorrect === true,
+    reactionMs: Math.max(0, typeof input.reactionMs === 'number' ? input.reactionMs : 0),
+    mistakeKana: typeof input.mistakeKana === 'string' ? input.mistakeKana : null,
+  }
+}
+
+function expandHistoryToTargetAttempts(history: KanaAttempt[]): KanaTargetAttempt[] {
+  return history.flatMap((attempt) => {
+    const reactionMs = attempt.appearanceCount <= 0 ? 0 : attempt.allocatedMs / attempt.appearanceCount
+    return Array.from({ length: attempt.appearanceCount }, (_, index) => ({
+      timestamp: attempt.timestamp,
+      attemptNumber: attempt.attemptNumber,
+      firstTryCorrect: index < attempt.correctCount,
+      finalCorrect: index < attempt.correctCount,
+      reactionMs,
+      mistakeKana: null,
+    }))
+  }).slice(-500)
 }
 
 function normalizeSessionResult(raw: unknown): SessionResult | null {

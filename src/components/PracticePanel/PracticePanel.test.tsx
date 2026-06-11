@@ -139,6 +139,23 @@ describe('PracticePanel component behavior', () => {
     expect(current.classes()).toContain('wrong')
   })
 
+  it('backspace correction still counts as a first-try miss', async () => {
+    const { store, wrapper } = mountPracticePanel([{ kana: 'あ' }])
+    const input = wrapper.find('input.hidden-ime-input')
+
+    await typeRomaji(wrapper, 'o')
+    await input.trigger('keydown', { key: 'Backspace' })
+    await typeRomaji(wrapper, 'a')
+
+    expect(store.lastEvaluation?.kanaAttempts[0]).toMatchObject({
+      kana: 'あ',
+      firstTryCorrect: false,
+      finalCorrect: true,
+      mistakeKana: 'お',
+    })
+    expect(store.lastEvaluation?.correctKanaCount).toBe(0)
+  })
+
   it('completing the batch auto-submits and shows result info', async () => {
     const { wrapper } = mountPracticePanel([{ kana: 'あ' }])
 
