@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useTypingFocus } from '../../composables/useTypingFocus'
 import { getCurrentWordRemainder } from '../../model/inputSurface'
 import type { SurfaceUnitView } from '../../model/inputSurface'
-import {getLastRomaji, isLatin, romajiToKana} from '../../model/kana'
+import { getLastRomaji, HIRAGANA_RE, isLatin, KATAKANA_RE, romajiToKana } from '../../model/kana'
 import { usePracticeStore } from '../../stores/practiceStore'
 import './PracticePanel.css'
 
@@ -39,37 +39,39 @@ export const PracticePanel = defineComponent(() => {
       return
     }
 
-    if (event.ctrlKey || event.altKey || event.metaKey) {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.key.length !== 1) {
       return
     }
 
-    if (event.key.length === 1 && isLatin(event.key.toLowerCase())) {
-      event.preventDefault()
-      composingText.value += event.key
+    if (!isLatin(event.key.toLowerCase()) && !HIRAGANA_RE.test(event.key) && !KATAKANA_RE.test(event.key)) {
+      return
+    }
 
-      // IME doesn't automatically replace 'n' at the end while composing,
-      // but we still want to automatically submit words like さん
-      const rawKanaText = composingKana.value
-      const kanaText = rawKanaText.at(-1)!.toLowerCase() === 'n'
-        ? rawKanaText.slice(0, -1) + 'ん'
-        : rawKanaText
-      const remainder = getCurrentWordRemainder(surfaceWords.value)
+    event.preventDefault()
+    composingText.value += event.key
 
-      for (let index = 0; index < kanaText.length; index++) {
-        const char = kanaText[index]
-        if (isLatin(char.toLowerCase())) break
+    // IME doesn't automatically replace 'n' at the end while composing,
+    // but we still want to automatically submit words like さん
+    const rawKanaText = composingKana.value
+    const kanaText = rawKanaText.at(-1)!.toLowerCase() === 'n'
+      ? rawKanaText.slice(0, -1) + 'ん'
+      : rawKanaText
+    const remainder = getCurrentWordRemainder(surfaceWords.value)
 
-        if (char === remainder[index]) {
-          submitComposedText(kanaText.slice(index, index + 1))
-          continue
-        }
+    for (let index = 0; index < kanaText.length; index++) {
+      const char = kanaText[index]
+      if (isLatin(char.toLowerCase())) break
 
-        // skip marking artificial ん as an incorrect answer
-        if (kanaText !== rawKanaText) break
-
-        store.markInputMistake(kanaText[index])
-        break
+      if (char === remainder[index]) {
+        submitComposedText(kanaText.slice(index, index + 1))
+        continue
       }
+
+      // skip marking artificial ん as an incorrect answer
+      if (kanaText !== rawKanaText) break
+
+      store.markInputMistake(kanaText[index])
+      break
     }
   }
 
