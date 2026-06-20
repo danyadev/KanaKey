@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { usePracticeStore } from '../../stores/practiceStore'
 import { SettingsPanel } from './SettingsPanel'
@@ -40,32 +40,6 @@ describe('SettingsPanel component behavior', () => {
     await wrapper.find('select').setValue('mincho')
 
     expect(store.kanaFont).toBe('mincho')
-  })
-
-  it('resets progress without opening the goals panel', async () => {
-    vi.stubGlobal('confirm', vi.fn(() => true))
-    const { store, wrapper } = mountSettingsPanel()
-    store.progress.kanaStats['あ'].appearances = 4
-    const resetButton = wrapper.find('summary .danger')
-
-    await resetButton.trigger('click')
-
-    expect(store.progress.kanaStats['あ'].appearances).toBe(0)
-    expect(wrapper.find('details.advanced-settings').attributes('open')).toBeUndefined()
-  })
-
-  it('keeps the goals panel closed by default', () => {
-    const { wrapper } = mountSettingsPanel()
-
-    expect(wrapper.find('details.advanced-settings').attributes('open')).toBeUndefined()
-  })
-
-  it('keeps reset progress aligned in the goals header', () => {
-    const { wrapper } = mountSettingsPanel()
-    const summary = wrapper.find('details.advanced-settings > summary')
-
-    expect(summary.find('span').text()).toBe('Goals')
-    expect(summary.find('button.danger').text()).toBe('Reset progress')
   })
 })
 

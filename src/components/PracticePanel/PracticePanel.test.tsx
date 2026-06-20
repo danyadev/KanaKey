@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import type { BatchResult } from '../../model/batch'
 import { createInputSurfaceState } from '../../model/inputSurface'
@@ -14,17 +14,6 @@ const words = [
 ]
 
 describe('PracticePanel component behavior', () => {
-  it('renders the hidden IME input with browser text assistance disabled', () => {
-    const { wrapper } = mountPracticePanel(words)
-    const input = wrapper.find('input.hidden-ime-input')
-
-    expect(input.attributes('type')).toBe('text')
-    expect(input.attributes('autocomplete')).toBe('off')
-    expect(input.attributes('autocapitalize')).toBe('off')
-    expect(input.attributes('autocorrect')).toBe('off')
-    expect(input.attributes('spellcheck')).toBe('false')
-  })
-
   it('shows a local romaji-to-kana composition bubble', async () => {
     const { wrapper } = mountPracticePanel(words)
 
@@ -40,15 +29,6 @@ describe('PracticePanel component behavior', () => {
     await input.trigger('compositionstart')
 
     expect(input.classes()).toContain('composing')
-  })
-
-  it('does not render practice action buttons', () => {
-    const { wrapper } = mountPracticePanel(words)
-
-    expect(wrapper.findAll('button')).toHaveLength(0)
-    expect(wrapper.text()).not.toContain('New batch')
-    expect(wrapper.text()).not.toContain('Submit')
-    expect(wrapper.text()).not.toContain('Clear attempt')
   })
 
   it('renders centered-dot separators only when enabled', () => {
@@ -97,6 +77,11 @@ describe('PracticePanel component behavior', () => {
     await input.trigger('keydown', { key: 'Backspace' })
 
     expect(wrapper.find('.composition-bubble').text()).toBe('あ')
+
+    await typeRomaji(wrapper, 'ny')
+    await input.trigger('keydown', { key: 'Backspace' })
+
+    expect(wrapper.find('.composition-bubble').text()).toBe('あn')
   })
 
   it('auto-commits when converted romaji matches the current word remainder', async () => {

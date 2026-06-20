@@ -22,12 +22,25 @@ DEFAULT_BEAM = 500
 DEFAULT_MAX_SCAN = 40
 DEFAULT_REPORT_LIMIT = 35
 
+FINAL_SOKUON = ('っ', 'ッ')
+
+JLPT_COUNT_WEIGHT = {
+    'N5': 1.00,
+    'N4': 0.95,
+    'N3': 0.85,
+    'N2': 0.75,
+    'N1': 0.65,
+}
+
+ONE_KANA_COUNT_WEIGHT = 0.20
+
 
 @dataclass(frozen=True)
 class RawWord:
     index: int
     kana: str
     script: Script
+    jlpt: str | None
 
 
 @dataclass(frozen=True)
@@ -36,7 +49,8 @@ class Word:
     kana: str
     mask: int
     unit_bits: frozenset[int]
-    weight: float
+    count_weight: float
+    rank_weight: float
 
 
 @dataclass(frozen=True)
@@ -50,6 +64,7 @@ class WordAnalyzer:
     def __init__(self, words: list[Word]) -> None:
         self.words = words
         self._eligible_count_cache: dict[tuple[int, int], int] = {}
+        self._eligible_useful_cache: dict[tuple[int, int], float] = {}
         self._eligible_words_cache: dict[tuple[int, int], list[Word]] = {}
         self._unlocked_score_cache: dict[int, float] = {}
 
@@ -68,6 +83,22 @@ class WordAnalyzer:
 
         self._eligible_count_cache[key] = count
         return count
+
+    def eligible_useful_score_for_target(self, mask: int, target_bit: int) -> float:
+        key = (mask, target_bit)
+        cached = self._eligible_useful_cache.get(key)
+        if cached is not None:
+            return cached
+
+        score = 0.0
+        target_mask = 1 << target_bit
+
+        for word in self.words:
+            if word.mask & ~mask == 0 and word.mask & target_mask:
+                score += word.count_weight
+
+        self._eligible_useful_cache[key] = score
+        return score
 
     def eligible_words_for_target(self, mask: int, target_bit: int) -> list[Word]:
         key = (mask, target_bit)
@@ -91,7 +122,7 @@ class WordAnalyzer:
             return cached
 
         score = sum(
-            word.weight
+            word.rank_weight
             for word in self.words
             if word.mask & ~mask == 0
         )
@@ -113,7 +144,14 @@ def main() -> int:
     args = parser.parse_args()
 
     source = KANA_TS.read_text(encoding='utf-8')
-    raw_words = load_words(WORDS_JSON)
+    raw_words, skipped_final_sokuon = load_words(WORDS_JSON)
+
+    if skipped_final_sokuon:
+        print('Skipped words ending with final small っ/ッ:')
+        for kana in skipped_final_sokuon[:40]:
+            print(f'  - {kana}')
+        if len(skipped_final_sokuon) > 40:
+            print(f'  ... and {len(skipped_final_sokuon) - 40} more')
 
     scripts: list[Script] = (
         ['hiragana', 'katakana']
@@ -185,7 +223,7 @@ def main() -> int:
             beam_width=args.beam,
         )
 
-        suggested_order = extend_greedy(
+        suggested_order = extend_order(
             start=initial_order,
             kana_units=kana_units,
             analyzer=analyzer,
@@ -224,9 +262,10 @@ def main() -> int:
     return 0
 
 
-def load_words(path: Path) -> list[RawWord]:
+def load_words(path: Path) -> tuple[list[RawWord], list[str]]:
     payload = json.loads(path.read_text(encoding='utf-8'))
     result: list[RawWord] = []
+    skipped_final_sokuon: list[str] = []
 
     for index, entry in enumerate(payload):
         kana = read_kana(entry)
@@ -234,8 +273,12 @@ def load_words(path: Path) -> list[RawWord]:
             continue
 
         kana = unicodedata.normalize('NFC', kana)
-        script = read_script(entry, kana)
 
+        if kana.endswith(FINAL_SOKUON):
+            skipped_final_sokuon.append(kana)
+            continue
+
+        script = read_script(entry, kana)
         if script is None:
             continue
 
@@ -244,10 +287,11 @@ def load_words(path: Path) -> list[RawWord]:
                 index=index,
                 kana=kana,
                 script=script,
+                jlpt=read_jlpt(entry),
             ),
         )
 
-    return result
+    return result, skipped_final_sokuon
 
 
 def read_kana(entry) -> str | None:
@@ -264,6 +308,14 @@ def read_kana(entry) -> str | None:
         or entry.get('word')
     )
 
+    return value if isinstance(value, str) else None
+
+
+def read_jlpt(entry) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+
+    value = entry.get('jlpt')
     return value if isinstance(value, str) else None
 
 
@@ -371,9 +423,8 @@ def build_words(raw_words: list[RawWord], kana_to_bit: dict[str, int]) -> list[W
         for bit in unit_bits:
             mask |= 1 << bit
 
-        # words.json is assumed to be ranked/usefulness-sorted.
-        # Earlier words should matter more than late words.
-        weight = 1.0 / ((rank + 1) ** 0.65)
+        count_weight = useful_count_weight(raw_word)
+        rank_weight = count_weight / ((rank + 1) ** 0.65)
 
         words.append(
             Word(
@@ -381,11 +432,21 @@ def build_words(raw_words: list[RawWord], kana_to_bit: dict[str, int]) -> list[W
                 kana=raw_word.kana,
                 mask=mask,
                 unit_bits=unit_bits,
-                weight=weight,
+                count_weight=count_weight,
+                rank_weight=rank_weight,
             ),
         )
 
     return words
+
+
+def useful_count_weight(word: RawWord) -> float:
+    units = split_units(word.kana)
+
+    length_weight = ONE_KANA_COUNT_WEIGHT if len(units) == 1 else 1.0
+    jlpt_weight = JLPT_COUNT_WEIGHT.get(word.jlpt or '', 1.0)
+
+    return length_weight * jlpt_weight
 
 
 def find_best_initial_prefix(
@@ -397,6 +458,19 @@ def find_best_initial_prefix(
     min_eligible: int,
     beam_width: int,
 ) -> list[str]:
+    current_prefix = first_ordered_prefix_with_dependencies(kana_units, size)
+
+    if initial_prefix_is_good(
+        prefix=current_prefix,
+        kana_units=kana_units,
+        analyzer=analyzer,
+        min_eligible=min_eligible,
+    ):
+        print('Initial prefix is already usable; preserving current order.')
+        return current_prefix
+
+    print('Initial prefix is underfed; searching for the smallest useful repair.')
+
     states = [
         CandidateState(
             order=(),
@@ -409,10 +483,16 @@ def find_best_initial_prefix(
         next_by_mask: dict[int, CandidateState] = {}
 
         for state in states:
-            used = set(state.order)
+            used_kana = {
+                kana_units[bit]
+                for bit in state.order
+            }
 
-            for bit in range(len(kana_units)):
-                if bit in used:
+            for bit, kana in enumerate(kana_units):
+                if bit in state.order:
+                    continue
+
+                if not dependencies_are_satisfied(kana, used_kana, kana_units):
                     continue
 
                 order = (*state.order, bit)
@@ -436,6 +516,9 @@ def find_best_initial_prefix(
                 if previous is None or candidate.score > previous.score:
                     next_by_mask[mask] = candidate
 
+        if not next_by_mask:
+            raise RuntimeError('Could not build an initial prefix with dependency rules.')
+
         states = sorted(
             next_by_mask.values(),
             key=lambda state: state.score,
@@ -448,11 +531,9 @@ def find_best_initial_prefix(
         )
 
     best = max(states, key=lambda state: state.score)
-    sorted_bits = sort_initial_bits(
+    sorted_bits = sort_selected_bits(
         bits=best.order,
-        mask=best.mask,
         kana_units=kana_units,
-        analyzer=analyzer,
         original_rank=original_rank,
     )
 
@@ -460,6 +541,63 @@ def find_best_initial_prefix(
         kana_units[bit]
         for bit in sorted_bits
     ]
+
+
+def first_ordered_prefix_with_dependencies(kana_units: list[str], size: int) -> list[str]:
+    result: list[str] = []
+    used: set[str] = set()
+
+    while len(result) < size:
+        candidate = first_available_by_current_order(
+            kana_units=kana_units,
+            used=used,
+        )
+
+        if candidate is None:
+            raise RuntimeError('Could not build the current dependency-aware prefix.')
+
+        result.append(candidate)
+        used.add(candidate)
+
+    return result
+
+
+def first_available_by_current_order(
+    *,
+    kana_units: list[str],
+    used: set[str],
+) -> str | None:
+    for kana in kana_units:
+        if kana in used:
+            continue
+
+        if dependencies_are_satisfied(kana, used, kana_units):
+            return kana
+
+    return None
+
+
+def initial_prefix_is_good(
+    *,
+    prefix: list[str],
+    kana_units: list[str],
+    analyzer: WordAnalyzer,
+    min_eligible: int,
+) -> bool:
+    kana_to_bit = {
+        kana: bit
+        for bit, kana in enumerate(kana_units)
+    }
+    mask = mask_for(prefix, kana_to_bit)
+
+    for kana in prefix:
+        bit = kana_to_bit[kana]
+        useful = analyzer.eligible_useful_score_for_target(mask, bit)
+
+        if useful < min_eligible:
+            return False
+
+    return True
 
 
 def score_initial_prefix(
@@ -471,18 +609,22 @@ def score_initial_prefix(
     original_rank: dict[str, int],
     min_eligible: int,
 ) -> tuple[float, ...]:
-    counts = [
+    useful_scores = [
+        analyzer.eligible_useful_score_for_target(mask, bit)
+        for bit in order
+    ]
+    raw_counts = [
         analyzer.eligible_count_for_target(mask, bit)
         for bit in order
     ]
 
-    if not counts:
+    if not useful_scores:
         return (0,)
 
-    min_count = min(counts)
-    ok_count = sum(1 for count in counts if count >= min_eligible)
-    capped_sum = sum(min(count, min_eligible) for count in counts)
-    raw_sum = sum(counts)
+    min_useful = min(useful_scores)
+    ok_count = sum(1 for score in useful_scores if score >= min_eligible)
+    capped_sum = sum(min(score, min_eligible) for score in useful_scores)
+    raw_sum = sum(raw_counts)
     unlocked_score = analyzer.unlocked_word_score(mask)
 
     rank_penalty = sum(
@@ -490,36 +632,59 @@ def score_initial_prefix(
         for bit in order
     )
 
+    movement_penalty = sum(
+        abs(index - original_rank.get(kana_units[bit], 999))
+        for index, bit in enumerate(order)
+    )
+
     return (
-        min(min_count, min_eligible),
-        min_count,
+        min(min_useful, min_eligible),
+        min_useful,
         ok_count,
         capped_sum,
         raw_sum,
         unlocked_score,
+        -movement_penalty,
         -rank_penalty,
     )
 
 
-def sort_initial_bits(
+def sort_selected_bits(
     *,
     bits: tuple[int, ...],
-    mask: int,
     kana_units: list[str],
-    analyzer: WordAnalyzer,
     original_rank: dict[str, int],
 ) -> list[int]:
-    return sorted(
-        bits,
-        key=lambda bit: (
-            -analyzer.eligible_count_for_target(mask, bit),
-            original_rank.get(kana_units[bit], 999),
-            kana_units[bit],
-        ),
-    )
+    remaining = set(bits)
+    result: list[int] = []
+    used: set[str] = set()
+
+    while remaining:
+        available = [
+            bit
+            for bit in remaining
+            if dependencies_are_satisfied(kana_units[bit], used, kana_units)
+        ]
+
+        if not available:
+            available = list(remaining)
+
+        best = min(
+            available,
+            key=lambda bit: (
+                original_rank.get(kana_units[bit], 999),
+                kana_units[bit],
+            ),
+        )
+
+        remaining.remove(best)
+        result.append(best)
+        used.add(kana_units[best])
+
+    return result
 
 
-def extend_greedy(
+def extend_order(
     *,
     start: list[str],
     kana_units: list[str],
@@ -529,55 +694,147 @@ def extend_greedy(
 ) -> list[str]:
     order = list(start)
     used = set(order)
-    mask = mask_for(order, {
+    kana_to_bit = {
         kana: bit
         for bit, kana in enumerate(kana_units)
-    })
+    }
+    mask = mask_for(order, kana_to_bit)
 
     while len(order) < len(kana_units):
-        best_kana: str | None = None
-        best_score: tuple[float, ...] | None = None
+        baseline = first_available_by_current_order(
+            kana_units=kana_units,
+            used=used,
+        )
 
-        for bit, kana in enumerate(kana_units):
-            if kana in used:
-                continue
+        if baseline is not None:
+            baseline_bit = kana_to_bit[baseline]
+            baseline_mask = mask | (1 << baseline_bit)
+            baseline_useful = analyzer.eligible_useful_score_for_target(
+                baseline_mask,
+                baseline_bit,
+            )
 
-            next_mask = mask | (1 << bit)
-            target_count = analyzer.eligible_count_for_target(next_mask, bit)
-            unlocked_score = analyzer.unlocked_word_score(next_mask)
-            starved_improvement = count_starvation_improvement(
-                analyzer=analyzer,
-                previous_mask=mask,
-                next_mask=next_mask,
-                target_kana=order,
+            # If the hand-written next kana has enough useful words, keep it.
+            # The optimizer is only allowed to jump ahead when the baseline is
+            # genuinely underfed or blocked by dependencies.
+            if baseline_useful >= min_eligible:
+                chosen = baseline
+            else:
+                chosen = find_best_repair_candidate(
+                    used=used,
+                    mask=mask,
+                    target_order=order,
+                    kana_units=kana_units,
+                    analyzer=analyzer,
+                    original_rank=original_rank,
+                    min_eligible=min_eligible,
+                )
+        else:
+            chosen = find_best_repair_candidate(
+                used=used,
+                mask=mask,
+                target_order=order,
                 kana_units=kana_units,
+                analyzer=analyzer,
+                original_rank=original_rank,
                 min_eligible=min_eligible,
             )
 
-            # Hard priority:
-            # 1. maximize words for the next required target kana
-            # 2. then generally useful unlocked words
-            # 3. then help previously starved targets
-            # 4. then preserve old order as a weak tie-breaker
-            score = (
-                min(target_count, min_eligible),
-                target_count,
-                unlocked_score,
-                starved_improvement,
-                -original_rank.get(kana, 999),
-            )
-
-            if best_score is None or score > best_score:
-                best_score = score
-                best_kana = kana
-
-        assert best_kana is not None
-
-        order.append(best_kana)
-        used.add(best_kana)
-        mask |= 1 << kana_units.index(best_kana)
+        bit = kana_to_bit[chosen]
+        order.append(chosen)
+        used.add(chosen)
+        mask |= 1 << bit
 
     return order
+
+
+def find_best_repair_candidate(
+    *,
+    used: set[str],
+    mask: int,
+    target_order: list[str],
+    kana_units: list[str],
+    analyzer: WordAnalyzer,
+    original_rank: dict[str, int],
+    min_eligible: int,
+) -> str:
+    best_kana: str | None = None
+    best_score: tuple[float, ...] | None = None
+
+    for bit, kana in enumerate(kana_units):
+        if kana in used:
+            continue
+
+        if not dependencies_are_satisfied(kana, used, kana_units):
+            continue
+
+        next_mask = mask | (1 << bit)
+        score = score_next_kana(
+            kana=kana,
+            bit=bit,
+            previous_mask=mask,
+            next_mask=next_mask,
+            target_order=target_order,
+            kana_units=kana_units,
+            analyzer=analyzer,
+            original_rank=original_rank,
+            min_eligible=min_eligible,
+        )
+
+        if best_score is None or score > best_score:
+            best_score = score
+            best_kana = kana
+
+    if best_kana is None:
+        raise RuntimeError('Could not find a kana candidate.')
+
+    return best_kana
+
+
+def score_next_kana(
+    *,
+    kana: str,
+    bit: int,
+    previous_mask: int,
+    next_mask: int,
+    target_order: list[str],
+    kana_units: list[str],
+    analyzer: WordAnalyzer,
+    original_rank: dict[str, int],
+    min_eligible: int,
+) -> tuple[float, ...]:
+    useful = analyzer.eligible_useful_score_for_target(next_mask, bit)
+    raw_count = analyzer.eligible_count_for_target(next_mask, bit)
+    unlocked_score = analyzer.unlocked_word_score(next_mask)
+    starved_improvement = count_starvation_improvement(
+        analyzer=analyzer,
+        previous_mask=previous_mask,
+        next_mask=next_mask,
+        target_kana=target_order,
+        kana_units=kana_units,
+        min_eligible=min_eligible,
+    )
+
+    original_position = original_rank.get(kana, 999)
+
+    if useful >= min_eligible:
+        return (
+            1,
+            starved_improvement,
+            -original_position,
+            min(useful, min_eligible),
+            raw_count,
+            unlocked_score,
+        )
+
+    return (
+        0,
+        useful,
+        starved_improvement,
+        unlocked_score,
+        raw_count,
+        -original_position,
+    )
 
 
 def count_starvation_improvement(
@@ -588,19 +845,81 @@ def count_starvation_improvement(
     target_kana: list[str],
     kana_units: list[str],
     min_eligible: int,
-) -> int:
-    improvement = 0
+) -> float:
+    improvement = 0.0
 
     for kana in target_kana:
         bit = kana_units.index(kana)
 
-        before = analyzer.eligible_count_for_target(previous_mask, bit)
-        after = analyzer.eligible_count_for_target(next_mask, bit)
+        before = analyzer.eligible_useful_score_for_target(previous_mask, bit)
+        after = analyzer.eligible_useful_score_for_target(next_mask, bit)
 
-        improvement += max(0, min_eligible - before)
-        improvement -= max(0, min_eligible - after)
+        improvement += max(0.0, min_eligible - before)
+        improvement -= max(0.0, min_eligible - after)
 
     return improvement
+
+
+def dependencies_are_satisfied(
+    kana: str,
+    used: set[str],
+    kana_units: list[str],
+) -> bool:
+    for dependency in dependencies_for(kana):
+        if dependency in kana_units and dependency not in used:
+            return False
+
+    return True
+
+
+def dependencies_for(kana: str) -> tuple[str, ...]:
+    return DEPENDENCIES.get(kana, ())
+
+
+def build_dependencies() -> dict[str, tuple[str, ...]]:
+    result: dict[str, tuple[str, ...]] = {}
+
+    for base, variants in [
+        ('か', 'が'), ('き', 'ぎ'), ('く', 'ぐ'), ('け', 'げ'), ('こ', 'ご'),
+        ('さ', 'ざ'), ('し', 'じ'), ('す', 'ず'), ('せ', 'ぜ'), ('そ', 'ぞ'),
+        ('た', 'だ'), ('ち', 'ぢ'), ('つ', 'づ'), ('て', 'で'), ('と', 'ど'),
+        ('は', 'ばぱ'), ('ひ', 'びぴ'), ('ふ', 'ぶぷ'), ('へ', 'べぺ'), ('ほ', 'ぼぽ'),
+        ('カ', 'ガ'), ('キ', 'ギ'), ('ク', 'グ'), ('ケ', 'ゲ'), ('コ', 'ゴ'),
+        ('サ', 'ザ'), ('シ', 'ジ'), ('ス', 'ズ'), ('セ', 'ゼ'), ('ソ', 'ゾ'),
+        ('タ', 'ダ'), ('チ', 'ヂ'), ('ツ', 'ヅ'), ('テ', 'デ'), ('ト', 'ド'),
+        ('ハ', 'バパ'), ('ヒ', 'ビピ'), ('フ', 'ブプ'), ('ヘ', 'ベペ'), ('ホ', 'ボポ'),
+    ]:
+        for variant in variants:
+            result[variant] = (base,)
+
+    result.update({
+        'ぁ': ('あ',),
+        'ぃ': ('い',),
+        'ぅ': ('う',),
+        'ぇ': ('え',),
+        'ぉ': ('お',),
+        'ゃ': ('や',),
+        'ゅ': ('ゆ',),
+        'ょ': ('よ',),
+        'ゎ': ('わ',),
+        'っ': ('か', 'し', 'た', 'く'),
+
+        'ァ': ('ア',),
+        'ィ': ('イ',),
+        'ゥ': ('ウ',),
+        'ェ': ('エ',),
+        'ォ': ('オ',),
+        'ャ': ('ヤ',),
+        'ュ': ('ユ',),
+        'ョ': ('ヨ',),
+        'ヮ': ('ワ',),
+        'ッ': ('カ', 'シ', 'タ', 'ク'),
+    })
+
+    return result
+
+
+DEPENDENCIES = build_dependencies()
 
 
 def mask_for(kana_list: list[str], kana_to_bit: dict[str, int]) -> int:
@@ -625,8 +944,8 @@ def print_progression_report(
 ) -> None:
     print()
     print(title)
-    print('step  kana  eligible  status')
-    print('----  ----  --------  ------')
+    print('step  kana  eligible  useful  status')
+    print('----  ----  --------  ------  ------')
 
     shown = min(limit, len(order))
 
@@ -635,9 +954,10 @@ def print_progression_report(
         mask = mask_for(prefix, kana_to_bit)
         bit = kana_to_bit[kana]
         count = analyzer.eligible_count_for_target(mask, bit)
-        status = 'ok' if count >= min_eligible else 'LOW'
+        useful = analyzer.eligible_useful_score_for_target(mask, bit)
+        status = 'ok' if useful >= min_eligible else 'LOW'
 
-        line = f'{index:>4}  {kana:<4}  {count:>8}  {status}'
+        line = f'{index:>4}  {kana:<4}  {count:>8}  {useful:>6.1f}  {status}'
 
         if sample > 0:
             samples = analyzer.eligible_words_for_target(mask, bit)[:sample]
@@ -656,9 +976,9 @@ def print_progression_report(
 
     if low:
         print()
-        print(f'Low targets under {min_eligible}:')
-        for index, kana, count in low[:40]:
-            print(f'  {index:>3}. {kana}: {count}')
+        print(f'Low targets under useful score {min_eligible}:')
+        for index, kana, useful in low[:40]:
+            print(f'  {index:>3}. {kana}: {useful:.1f}')
 
 
 def find_low_targets(
@@ -668,17 +988,17 @@ def find_low_targets(
     kana_to_bit: dict[str, int],
     min_eligible: int,
     initial: int,
-) -> list[tuple[int, str, int]]:
-    low: list[tuple[int, str, int]] = []
+) -> list[tuple[int, str, float]]:
+    low: list[tuple[int, str, float]] = []
 
     for index, kana in enumerate(order, start=1):
         prefix = order[:max(initial, index)]
         mask = mask_for(prefix, kana_to_bit)
         bit = kana_to_bit[kana]
-        count = analyzer.eligible_count_for_target(mask, bit)
+        useful = analyzer.eligible_useful_score_for_target(mask, bit)
 
-        if count < min_eligible:
-            low.append((index, kana, count))
+        if useful < min_eligible:
+            low.append((index, kana, useful))
 
     return low
 
@@ -695,8 +1015,8 @@ def print_initial_scan(
 ) -> None:
     print()
     print(title)
-    print('size  min  avg    ok/total  worst')
-    print('----  ---  -----  --------  -----')
+    print('size  min useful  avg useful  ok/total  worst')
+    print('----  ----------  ----------  --------  -----')
 
     max_size = min(max_size, len(order))
 
@@ -704,26 +1024,26 @@ def print_initial_scan(
         prefix = order[:size]
         mask = mask_for(prefix, kana_to_bit)
 
-        counts = [
+        scores = [
             (
                 kana,
-                analyzer.eligible_count_for_target(mask, kana_to_bit[kana]),
+                analyzer.eligible_useful_score_for_target(mask, kana_to_bit[kana]),
             )
             for kana in prefix
         ]
 
-        min_count = min(count for _, count in counts)
-        avg_count = sum(count for _, count in counts) / len(counts)
-        ok_count = sum(1 for _, count in counts if count >= min_eligible)
+        min_score = min(score for _, score in scores)
+        avg_score = sum(score for _, score in scores) / len(scores)
+        ok_count = sum(1 for _, score in scores if score >= min_eligible)
 
         worst = ' '.join(
-            f'{kana}:{count}'
-            for kana, count in sorted(counts, key=lambda item: item[1])[:5]
+            f'{kana}:{score:.1f}'
+            for kana, score in sorted(scores, key=lambda item: item[1])[:5]
         )
 
         print(
-            f'{size:>4}  {min_count:>3}  {avg_count:>5.1f}  '
-            f'{ok_count:>2}/{len(counts):<5}  {worst}',
+            f'{size:>4}  {min_score:>10.1f}  {avg_score:>10.1f}  '
+            f'{ok_count:>2}/{len(scores):<5}  {worst}',
         )
 
 

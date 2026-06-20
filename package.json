@@ -12,7 +12,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate-words": "python3 scripts/generate_words.py",
+    "generate-words": "python3 scripts/generate_words.py --levels N5 N4 N3",
     "optimize-kana": "python3 scripts/optimize_kana_order.py --script hiragana --min 10 --initial 5 --beam 500 --sample 8"
   },
   "dependencies": {

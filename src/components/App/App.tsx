@@ -2,7 +2,7 @@ import { storeToRefs } from 'pinia'
 import { defineComponent } from 'vue'
 
 import { usePracticeStore } from '../../stores/practiceStore'
-import seedWords from '../../words.json'
+import words from '../../words.json'
 import type { WordEntry } from '../../model/words'
 import { Hero } from '../Hero/Hero'
 import { HistoryPanel } from '../HistoryPanel/HistoryPanel'
@@ -15,7 +15,7 @@ import './App.css'
 export const App = defineComponent(() => {
   const store = usePracticeStore()
 
-  store.initialize({ words: seedWords as WordEntry[] })
+  store.initialize({ words: words as WordEntry[] })
 
   const {
     dailyProgress,
