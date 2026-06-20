@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useTypingFocus } from '../../composables/useTypingFocus'
 import { getCurrentWordRemainder } from '../../model/inputSurface'
 import type { SurfaceUnitView } from '../../model/inputSurface'
-import { getLastRomaji, romajiToKana } from '../../model/kana'
+import {getLastRomaji, isLatin, romajiToKana} from '../../model/kana'
 import { usePracticeStore } from '../../stores/practiceStore'
 import './PracticePanel.css'
 
@@ -43,26 +43,32 @@ export const PracticePanel = defineComponent(() => {
       return
     }
 
-    if (event.key.length === 1 && (event.key >= 'a' && event.key <= 'z' || event.key >= 'A' && event.key <= 'Z')) {
+    if (event.key.length === 1 && isLatin(event.key.toLowerCase())) {
       event.preventDefault()
       composingText.value += event.key
 
       // IME doesn't automatically replace 'n' at the end while composing,
       // but we still want to automatically submit words like さん
-      const hasTrailingN = composingKana.value.at(-1)?.toLowerCase() === 'n'
-      const kanaText = hasTrailingN
-        ? composingKana.value.slice(0, -1) + 'ん'
-        : composingKana.value
+      const rawKanaText = composingKana.value
+      const kanaText = rawKanaText.at(-1)!.toLowerCase() === 'n'
+        ? rawKanaText.slice(0, -1) + 'ん'
+        : rawKanaText
       const remainder = getCurrentWordRemainder(surfaceWords.value)
 
-      if (kanaText === remainder) {
-        submitComposedText(kanaText)
-        return
-      }
+      for (let index = 0; index < kanaText.length; index++) {
+        const char = kanaText[index]
+        if (isLatin(char.toLowerCase())) break
 
-      if (!hasTrailingN && !/[a-z]/i.test(kanaText)) {
-        const mistakeKana = firstMismatchKana(kanaText, remainder)
-        if (mistakeKana) store.markInputMistake(mistakeKana)
+        if (char === remainder[index]) {
+          submitComposedText(kanaText.slice(index, index + 1))
+          continue
+        }
+
+        // skip marking artificial ん as an incorrect answer
+        if (kanaText !== rawKanaText) break
+
+        store.markInputMistake(kanaText[index])
+        break
       }
     }
   }
@@ -184,10 +190,3 @@ const MeterRow = defineComponent<MeterRowProps>((props) => {
 }, {
   props: ['label', 'width', 'value'],
 })
-
-function firstMismatchKana(input: string, expected: string): string | null {
-  for (let index = 0; index < input.length; index++) {
-    if (input[index] !== expected[index]) return input[index]
-  }
-  return null
-}

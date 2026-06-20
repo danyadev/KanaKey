@@ -276,9 +276,13 @@ function isDoubleConsonant(char: string, nextChar: string): boolean {
 }
 
 function isConsonant(char: string): boolean {
-  return char >= 'a' && char <= 'z' && !isVowel(char)
+  return isLatin(char) && !isVowel(char)
 }
 
 function isVowel(char: string | undefined): boolean {
   return char === 'a' || char === 'i' || char === 'u' || char === 'e' || char === 'o'
+}
+
+export function isLatin(char: string) {
+  return char >= 'a' && char <= 'z'
 }
