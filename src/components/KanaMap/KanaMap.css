@@ -235,11 +235,40 @@
 
 @media (max-width: 760px) {
   .progress-panel {
-    padding: 16px;
+    padding: 12px;
   }
 
   .kana-rows {
     grid-template-columns: 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .kana-row {
+    grid-template-columns: 24px 1fr;
+    gap: 5px;
+  }
+
+  .row-label {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    font-size: 0.78rem;
+  }
+
+  .row-kana {
+    gap: 3px;
+  }
+
+  .kana-pill {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 0.92rem;
+  }
+
+  .kana-script-divider {
+    margin: 4px 0;
   }
 
   .kana-metric-grid {

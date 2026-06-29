@@ -36,11 +36,13 @@
 .app-stage,
 .tab-panel {
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .app-stage {
   display: grid;
+  margin: -10px;
+  padding: 10px;
 }
 
 .tab-panel {
@@ -59,7 +61,7 @@
   align-items: start;
   max-height: 100%;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .practice-workspace .practice {

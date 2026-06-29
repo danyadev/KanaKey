@@ -14,12 +14,13 @@ const words = [
 ]
 
 describe('PracticePanel component behavior', () => {
-  it('shows a local romaji-to-kana composition bubble', async () => {
-    const { wrapper } = mountPracticePanel(words)
+  it('auto-commits matching local romaji-to-kana input', async () => {
+    const { store, wrapper } = mountPracticePanel(words)
 
     await typeRomaji(wrapper, 'a')
 
-    expect(wrapper.find('.composition-bubble').text()).toBe('あ')
+    expect(store.inputState.cursorIndex).toBe(1)
+    expect(wrapper.find('.composition-bubble').exists()).toBe(false)
   })
 
   it('marks the hidden input while native IME composition is active', async () => {
@@ -65,23 +66,23 @@ describe('PracticePanel component behavior', () => {
 
     await typeRomaji(wrapper, 'ak')
 
-    expect(wrapper.find('.composition-bubble').text()).toBe('あk')
-    expect(store.inputState.cursorIndex).toBe(0)
+    expect(wrapper.find('.composition-bubble').text()).toBe('k')
+    expect(store.inputState.cursorIndex).toBe(1)
   })
 
   it('Backspace removes the last romaji unit from the preview', async () => {
     const { wrapper } = mountPracticePanel([{ kana: 'あかい' }])
     const input = wrapper.find('input.hidden-ime-input')
 
-    await typeRomaji(wrapper, 'aka')
+    await typeRomaji(wrapper, 'k')
     await input.trigger('keydown', { key: 'Backspace' })
 
-    expect(wrapper.find('.composition-bubble').text()).toBe('あ')
+    expect(wrapper.find('.composition-bubble').exists()).toBe(false)
 
     await typeRomaji(wrapper, 'ny')
     await input.trigger('keydown', { key: 'Backspace' })
 
-    expect(wrapper.find('.composition-bubble').text()).toBe('あn')
+    expect(wrapper.find('.composition-bubble').text()).toBe('n')
   })
 
   it('auto-commits when converted romaji matches the current word remainder', async () => {
