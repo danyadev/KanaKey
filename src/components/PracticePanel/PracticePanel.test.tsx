@@ -61,6 +61,18 @@ describe('PracticePanel component behavior', () => {
     expect(store.inputState.cursorIndex).toBe(1)
   })
 
+  it('native kana input commits without waiting for keydown', async () => {
+    const { store, wrapper } = mountPracticePanel(words)
+    const input = wrapper.find('input.hidden-ime-input')
+    const element = input.element as HTMLInputElement
+
+    element.value = 'あ'
+    await input.trigger('input')
+
+    expect(store.inputState.cursorIndex).toBe(1)
+    expect(element.value).toBe('')
+  })
+
   it('leaves unfinished romaji visible in the preview', async () => {
     const { store, wrapper } = mountPracticePanel([{ kana: 'あかい' }])
 

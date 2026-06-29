@@ -47,8 +47,8 @@ export const KanaMap = defineComponent(() => {
       </div>
       <div class="kana-rows">
         {rows.value.flatMap((row, index) => {
-          const divider = index > 0 && rows.value[index - 1].script !== row.script
-            ? <div key="script-divider" class="kana-script-divider" aria-hidden="true" />
+          const heading = index === 0 || rows.value[index - 1].script !== row.script
+            ? <div key={`${row.script}-heading`} class={['kana-script-heading', row.script]}>{scriptLabel(row.script)}</div>
             : null
           const rowNode = (
             <div key={row.id} class={['kana-row', row.script]}>
@@ -69,7 +69,7 @@ export const KanaMap = defineComponent(() => {
             </div>
           )
 
-          return divider ? [divider, rowNode] : [rowNode]
+          return heading ? [heading, rowNode] : [rowNode]
         })}
       </div>
       {selectedMetrics.value && (
@@ -201,6 +201,10 @@ function statusLabel(status: string): string {
   if (status === 'mastered') return 'Mastered'
   if (status === 'rusty') return 'Rusty'
   return 'Unlocked'
+}
+
+function scriptLabel(script: string): string {
+  return script === 'katakana' ? 'Katakana' : 'Hiragana'
 }
 
 function formatKpm(value: number | null): string {
