@@ -24,7 +24,6 @@ export const PracticePanel = defineComponent(() => {
   const composingText = shallowRef('')
   const composingKana = computed(() => romajiToKana(composingText.value))
   const isComposing = shallowRef(false)
-  const ignoredNativeText = shallowRef<string | null>(null)
 
   const onKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Backspace') {
@@ -59,24 +58,30 @@ export const PracticePanel = defineComponent(() => {
       : rawKanaText
     const remainder = getCurrentWordRemainder(surfaceWords.value)
 
-    commitVisibleKana(kanaText, rawKanaText, remainder)
+    for (let index = 0; index < kanaText.length; index++) {
+      const char = kanaText[index]
+      if (isLatin(char.toLowerCase())) break
+
+      if (char === remainder[index]) {
+        submitComposedText(char)
+        continue
+      }
+
+      // skip marking artificial ん as an incorrect answer
+      if (kanaText !== rawKanaText) break
+
+      store.markInputMistake(char)
+      break
+    }
   }
 
   const onCompositionStart = () => {
     isComposing.value = true
   }
 
-  const onCompositionUpdate = (event: CompositionEvent) => {
-    if (event.data.length === 1) commitNativeText(event.data)
-  }
-
-  const onCompositionEnd = (event: CompositionEvent) => {
+  const onCompositionEnd = () => {
     isComposing.value = false
-    commitNativeText(event.data || composingKana.value)
-  }
-
-  const onInput = (event: Event) => {
-    commitNativeText((event.target as HTMLInputElement).value)
+    submitComposedText(composingKana.value)
   }
 
   const submitComposedText = (kanaText: string) => {
@@ -87,51 +92,6 @@ export const PracticePanel = defineComponent(() => {
     composingText.value = ''
     input.value = ''
     focusTypingBox()
-  }
-
-  const commitNativeText = (text: string) => {
-    const kanaText = text.trim()
-    const input = typingBox.value
-    if (!kanaText) return
-
-    if (ignoredNativeText.value === kanaText) {
-      ignoredNativeText.value = null
-      if (input) input.value = ''
-      return
-    }
-
-    const handled = commitVisibleKana(kanaText, kanaText, getCurrentWordRemainder(surfaceWords.value))
-    if (!handled) return
-
-    if (input) input.value = ''
-    ignoredNativeText.value = kanaText
-    window.setTimeout(() => {
-      if (ignoredNativeText.value === kanaText) ignoredNativeText.value = null
-    }, 250)
-  }
-
-  const commitVisibleKana = (kanaText: string, rawKanaText: string, remainder: string): boolean => {
-    let handled = false
-
-    for (let index = 0; index < kanaText.length; index++) {
-      const char = kanaText[index]
-      if (isLatin(char.toLowerCase())) break
-
-      if (char === remainder[index]) {
-        submitComposedText(char)
-        handled = true
-        continue
-      }
-
-      // skip marking artificial ん as an incorrect answer
-      if (kanaText !== rawKanaText) break
-
-      store.markInputMistake(char)
-      handled = true
-      break
-    }
-
-    return handled
   }
 
   const focusInput = () => {
@@ -148,9 +108,7 @@ export const PracticePanel = defineComponent(() => {
       autocapitalize="off"
       autocorrect="off"
       onKeydown={onKeydown}
-      onInput={onInput}
       onCompositionstart={onCompositionStart}
-      onCompositionupdate={onCompositionUpdate}
       onCompositionend={onCompositionEnd}
     />
   )

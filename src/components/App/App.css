@@ -61,7 +61,6 @@
   align-items: start;
   max-height: 100%;
   min-height: 0;
-  overflow: hidden;
 }
 
 .practice-workspace .practice {
@@ -111,6 +110,24 @@
 }
 
 @media (max-width: 760px) {
+  .app-stage,
+  .tab-panel,
+  .practice-workspace {
+    overflow: visible;
+  }
+
+  .tab-panel {
+    height: auto;
+  }
+
+  .practice-workspace {
+    max-height: none;
+  }
+
+  .scroll-panel {
+    overflow: visible;
+  }
+
   .app-tabs {
     gap: 4px;
   }
