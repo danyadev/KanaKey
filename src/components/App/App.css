@@ -1,13 +1,127 @@
-.trainer-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 12px;
-  align-items: start;
-  margin-top: 10px;
+.app-tabs {
+  display: flex;
+  gap: 6px;
+  min-height: 0;
+  overflow-x: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 250, 239, 0.62);
+  box-shadow: var(--shadow);
+  scrollbar-width: none;
 }
 
-@media (max-width: 940px) {
-  .trainer-layout {
-    grid-template-columns: 1fr;
+.app-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.app-tabs button {
+  flex: 1 0 max-content;
+  min-width: 74px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.app-tabs button.active {
+  background: rgba(255, 248, 235, 0.94);
+  color: var(--ink);
+  box-shadow: 0 5px 14px rgba(76, 47, 19, 0.09);
+}
+
+.app-stage,
+.tab-panel {
+  min-height: 0;
+  overflow: visible;
+}
+
+.app-stage {
+  display: grid;
+}
+
+.tab-panel {
+  grid-area: 1 / 1;
+  height: 100%;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+.practice-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 12px;
+  align-items: start;
+  max-height: 100%;
+  min-height: 0;
+  overflow: visible;
+}
+
+.practice-workspace .practice {
+  min-height: 0;
+  max-height: 100%;
+}
+
+.practice-side {
+  min-height: 0;
+  overflow: visible;
+}
+
+.practice-side .stats-grid {
+  margin: 0;
+}
+
+.scroll-panel {
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: -8px;
+  padding: 8px;
+}
+
+.scroll-panel > .panel:first-child,
+.scroll-panel > .stats-grid:first-child {
+  margin-top: 0;
+}
+
+.settings-tab {
+  display: grid;
+  align-content: start;
+}
+
+.settings-tab .settings-panel {
+  width: min(100%, 520px);
+  margin: 0 auto;
+}
+
+@media (max-width: 900px), (max-height: 720px) {
+  .practice-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .practice-side {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-tabs {
+    gap: 4px;
+  }
+
+  .app-tabs button {
+    min-width: 68px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .app-tabs button {
+    padding-block: 6px;
   }
 }

@@ -1,3 +1,10 @@
+html,
+body,
+#app,
+#root {
+  height: 100%;
+}
+
 :root {
   color-scheme: light;
   --ink: #211d17;
@@ -9,7 +16,7 @@
   --vermilion: #b94b34;
   --moss: #587a55;
   --sea: #2f7285;
-  --shadow: 0 10px 30px rgba(76, 47, 19, 0.08);
+  --shadow: 0 5px 10px rgba(76, 47, 19, 0.08);
   --radius: 16px;
   font-family: "Avenir Next", "Gill Sans", "Helvetica Neue", sans-serif;
   background: var(--paper);
@@ -23,7 +30,9 @@
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background:
     radial-gradient(circle at 16% 8%, rgba(200, 75, 49, 0.1), transparent 24rem),
     radial-gradient(circle at 90% 4%, rgba(47, 114, 133, 0.1), transparent 26rem),
@@ -108,9 +117,15 @@ b, strong {
 
 .shell {
   position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
   width: min(1180px, calc(100% - 28px));
+  height: 100dvh;
+  min-height: 0;
   margin: 0 auto;
-  padding: 14px 0 36px;
+  padding: 12px 0;
+  overflow: visible;
 }
 
 .panel {
@@ -141,7 +156,8 @@ b, strong {
 @media (max-width: 760px) {
   .shell {
     width: min(100% - 20px, 680px);
-    padding-top: 10px;
+    padding: 8px 0;
+    gap: 8px;
   }
 
   .section-head {

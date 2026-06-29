@@ -21,6 +21,11 @@ export const KanaMap = defineComponent(() => {
   const targetKpm = computed(() => settings.value.targetKpm)
 
   function selectKana(kana: string, event: MouseEvent) {
+    if (selectedKana.value === kana) {
+      selectedKana.value = null
+      return
+    }
+
     selectedKana.value = kana
     const panelRect = panel.value?.getBoundingClientRect()
     const targetRect = (event.currentTarget as HTMLElement).getBoundingClientRect()

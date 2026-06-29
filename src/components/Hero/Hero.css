@@ -3,7 +3,7 @@
   grid-template-columns: 1fr minmax(210px, 280px);
   gap: 14px;
   align-items: center;
-  min-height: 82px;
+  min-height: 0;
   padding: 14px 16px;
   overflow: hidden;
 }
@@ -14,7 +14,7 @@
   font-size: clamp(1.5rem, 2.6vw, 2.4rem);
   font-weight: 600;
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .lede {
@@ -69,7 +69,42 @@
 
 @media (max-width: 760px) {
   .hero {
+    grid-template-columns: 1fr minmax(150px, 210px);
+    gap: 10px;
+    padding: 11px 12px;
+  }
+
+  .hero h1 {
+    font-size: 1.35rem;
+  }
+
+  .lede {
+    display: none;
+  }
+
+  .goal-card {
+    min-height: 0;
+    padding: 8px 9px;
+  }
+
+  .goal-line {
+    grid-template-columns: 48px 1fr 52px;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 560px), (max-height: 660px) {
+  .hero {
     grid-template-columns: 1fr;
-    padding: 14px;
+  }
+
+  .goal-card {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .hero {
+    display: none;
   }
 }

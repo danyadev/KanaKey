@@ -58,21 +58,15 @@ export const PracticePanel = defineComponent(() => {
       : rawKanaText
     const remainder = getCurrentWordRemainder(surfaceWords.value)
 
-    for (let index = 0; index < kanaText.length; index++) {
-      const char = kanaText[index]
-      if (isLatin(char.toLowerCase())) break
+    if (containsLatin(kanaText)) return
 
-      if (char === remainder[index]) {
-        submitComposedText(kanaText.slice(index, index + 1))
-        continue
-      }
-
-      // skip marking artificial ん as an incorrect answer
-      if (kanaText !== rawKanaText) break
-
-      store.markInputMistake(kanaText[index])
-      break
+    if (kanaText === remainder) {
+      submitComposedText(kanaText)
+      return
     }
+
+    // skip marking artificial ん as an incorrect answer
+    if (kanaText === rawKanaText && !remainder.startsWith(kanaText)) store.markInputMistake(kanaText[0])
   }
 
   const onCompositionStart = () => {
@@ -174,6 +168,10 @@ export const PracticePanel = defineComponent(() => {
     </article>
   )
 })
+
+function containsLatin(value: string): boolean {
+  return [...value].some((char) => isLatin(char.toLowerCase()))
+}
 
 type MeterRowProps = {
   label: string

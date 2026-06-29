@@ -39,8 +39,10 @@
   flex-wrap: wrap;
   gap: 10px 13px;
   align-items: center;
+  align-content: center;
   justify-content: center;
   min-height: 112px;
+  overflow: hidden;
   margin-top: 12px;
   padding: 20px 17px;
   border: 1px solid rgba(60, 45, 26, 0.14);
@@ -56,10 +58,10 @@
   display: inline-flex;
   align-items: center;
   color: var(--ink);
-  font-size: clamp(1.65rem, 2.7vw, 2.65rem);
+  font-size: clamp(1.5rem, 2.5vw, 2.55rem);
   font-weight: 400;
   line-height: 1.18;
-  letter-spacing: 0.015em;
+  letter-spacing: 0;
 }
 
 .surface-kana {
@@ -146,7 +148,7 @@
 }
 
 .hidden-ime-input.composing {
-  left: -10000px;
+  left: 0;
 }
 
 .warning,
@@ -220,12 +222,12 @@
 
 @media (max-width: 760px) {
   .practice {
-    padding: 16px;
+    padding: 14px;
   }
 
   .typing-surface {
-    min-height: 116px;
-    padding: 16px 14px;
+    min-height: 0;
+    padding: 16px 12px;
   }
 
   .meter-row {
@@ -235,5 +237,44 @@
   .meter-row b {
     grid-column: 2;
     text-align: left;
+  }
+}
+
+@media (max-height: 700px) {
+  .practice {
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    padding: 12px;
+  }
+
+  .practice > .eyebrow {
+    display: none;
+  }
+
+  .pass-card {
+    margin-top: 0;
+  }
+
+  .typing-surface {
+    margin-top: 9px;
+    padding-block: 12px;
+  }
+
+  .surface-word {
+    font-size: clamp(1.35rem, 4vw, 2.2rem);
+  }
+}
+
+@media (max-height: 580px) {
+  .result-strip,
+  .outcome {
+    display: none;
+  }
+
+  .pass-card {
+    padding: 9px 10px;
+  }
+
+  .typing-surface {
+    margin-top: 8px;
   }
 }

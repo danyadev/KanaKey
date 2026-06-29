@@ -3,6 +3,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 12px 0 0;
+  min-width: 0;
 }
 
 .stat {
@@ -30,4 +31,8 @@
   .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.practice-side .stats-grid {
+  grid-template-columns: 1fr;
 }

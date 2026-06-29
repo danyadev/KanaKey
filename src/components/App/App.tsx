@@ -1,5 +1,5 @@
 import { storeToRefs } from 'pinia'
-import { defineComponent } from 'vue'
+import { defineComponent, shallowRef } from 'vue'
 
 import { usePracticeStore } from '../../stores/practiceStore'
 import words from '../../words.json'
@@ -12,8 +12,18 @@ import { SettingsPanel } from '../SettingsPanel/SettingsPanel'
 import { StatsGrid } from '../StatsGrid/StatsGrid'
 import './App.css'
 
+type AppTab = 'practice' | 'kana' | 'stats' | 'settings'
+
+const tabs: Array<{ id: AppTab, label: string }> = [
+  { id: 'practice', label: 'Practice' },
+  { id: 'kana', label: 'Kana' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'settings', label: 'Settings' },
+]
+
 export const App = defineComponent(() => {
   const store = usePracticeStore()
+  const activeTab = shallowRef<AppTab>('practice')
 
   store.initialize({ words: words as WordEntry[] })
 
@@ -32,14 +42,43 @@ export const App = defineComponent(() => {
         dailyProgressPercent={dailyProgress.value.percent}
       />
 
-      <section class="trainer-layout">
-        <PracticePanel />
-        <SettingsPanel />
-      </section>
+      <nav class="app-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            class={{ active: activeTab.value === tab.id }}
+            aria-selected={activeTab.value === tab.id}
+            onClick={() => { activeTab.value = tab.id }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
-      <StatsGrid />
-      <KanaMap />
-      <HistoryPanel />
+      <section class="app-stage">
+        <section class="tab-panel practice-tab" hidden={activeTab.value !== 'practice'}>
+          <div class="practice-workspace">
+            <PracticePanel />
+            <aside class="practice-side">
+              <StatsGrid />
+            </aside>
+          </div>
+        </section>
+
+        <section class="tab-panel scroll-panel" hidden={activeTab.value !== 'kana'}>
+          <KanaMap />
+        </section>
+
+        <section class="tab-panel scroll-panel" hidden={activeTab.value !== 'stats'}>
+          <StatsGrid />
+          <HistoryPanel />
+        </section>
+
+        <section class="tab-panel scroll-panel settings-tab" hidden={activeTab.value !== 'settings'}>
+          <SettingsPanel />
+        </section>
+      </section>
     </main>
   )
 })

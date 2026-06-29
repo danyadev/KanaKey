@@ -245,4 +245,41 @@
   .kana-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .kana-metrics-popup {
+    position: fixed;
+    left: 12px !important;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    top: auto !important;
+    width: auto;
+    max-height: min(62dvh, 430px);
+    overflow: auto;
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 16px 38px rgba(60, 45, 26, 0.24);
+    overscroll-behavior: contain;
+  }
+
+  .kana-popup-close {
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+
+  .kana-metrics-head {
+    padding-right: 34px;
+  }
+}
+
+@media (max-width: 420px) {
+  .kana-speed-line {
+    font-size: 0.84rem;
+  }
+
+  .kana-chart {
+    max-height: 110px;
+  }
 }

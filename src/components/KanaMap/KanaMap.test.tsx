@@ -31,6 +31,23 @@ describe('KanaMap', () => {
     expect(wrapper.text()).toContain('Accuracy')
     expect(wrapper.findAll('.kana-chart-dot')).toHaveLength(3)
   })
+
+  it('closes per-kana metrics when the selected kana is clicked again', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = usePracticeStore()
+    store.initialize({ keyValueStorage: createMapStorage(), words: [{ script: 'hiragana', kana: 'あい', meaning: 'あい', jlpt: 'N5' }] })
+
+    const wrapper = mount(KanaMap, { global: { plugins: [pinia] } })
+    const kanaButton = wrapper.findAll('button.kana-pill').find((button) => button.text() === 'あ')!
+
+    await kanaButton.trigger('click')
+    expect(wrapper.find('.kana-metrics-popup').exists()).toBe(true)
+
+    await kanaButton.trigger('click')
+    expect(wrapper.find('.kana-metrics-popup').exists()).toBe(false)
+    expect(kanaButton.attributes('aria-pressed')).toBe('false')
+  })
 })
 
 function attempts(count: number, patch: Partial<KanaTargetAttempt>): KanaTargetAttempt[] {
